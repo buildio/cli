@@ -98,6 +98,27 @@ module Build
         end
       end
 
+      # namespaces:delete             Delete a namespace
+      @[ACONA::AsCommand("namespaces:delete")]
+      class Delete < Base
+        protected def configure : Nil
+          self
+            .name("namespaces:delete")
+            .description("Delete a namespace")
+            .argument("namespace", :required, "The namespace ID or name")
+            .help("Delete a namespace.")
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          namespace_input = input.argument("namespace", type: String | Nil) || input.option("namespace", type: String | Nil)
+          if namespace_input.nil?
+            output.puts "You must specify a namespace ID or name."
+            return ACON::Command::Status::FAILURE
+          end
+          api.delete_namespace(namespace_input)
+          return ACON::Command::Status::SUCCESS
+        end
+      end
+
     end
   end
 end

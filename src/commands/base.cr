@@ -24,6 +24,7 @@ module Build
         Build.configure do |config|
           config.host           = Build.api_host
           config.access_token   = user_token
+          # config.debugging      = true
         end
 
         # Configure the API client
