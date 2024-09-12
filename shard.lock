@@ -6,11 +6,11 @@ shards:
 
   athena-console:
     git: https://github.com/athena-framework/console.git
-    version: 0.3.5
+    version: 0.3.6
 
   build-client:
     git: https://github.com/buildio/sdk-crystal-lang.git
-    version: 1.0.0+git.commit.acd7d31be2a9ba02405b8d19685e404c69543ebf
+    version: 1.0.1+git.commit.cb58acf1c4d82012f63da0ba9fa642f6248c8eed
 
   crest:
     git: https://github.com/mamantoha/crest.git
@@ -22,7 +22,7 @@ shards:
 
   http_proxy:
     git: https://github.com/mamantoha/http_proxy.git
-    version: 0.10.3
+    version: 0.12.0
 
   netrc:
     git: https://github.com/usiegj00/crystal-netrc.git
