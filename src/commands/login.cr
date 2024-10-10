@@ -21,11 +21,16 @@ module Build
       def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         input = prompt_any_key("Press any key to open up the browser to login or q to exit")
         return ACON::Command::Status::FAILURE if input == 'q'
+        Build.configure do |config|
+          config.host           = Build.api_host
+          config.scheme         = Build.api_host_scheme
+          config.debugging      = Build.debugging?
+        end
 
         user_token = nil
         user_email = nil
         client_secret = UUID.random
-        oauth_url = "https://#{Build.api_host}/cli_auth/authorize/#{client_secret}"
+        oauth_url = "#{Build.configure.base_url}/cli_auth/authorize/#{client_secret}"
         output.puts "Opening browser to #{oauth_url.colorize.mode(:underline)}"
 
         frames = %w{⠙ ⠹ ⠸ ⠼ ⠴}
@@ -43,7 +48,7 @@ module Build
         timeout = Time::Span.new(seconds: timeout_seconds)
         start_time = Time.utc
         loop do
-          url = "https://#{Build.api_host}/api/cli_auth/resolve/#{client_secret}"
+          url = "#{Build.configure.base_url}/api/cli_auth/resolve/#{client_secret}"
           response = HTTP::Client.get(url)
           if response.status_code == 200
             json_response = JSON.parse(response.body)
