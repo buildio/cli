@@ -23,8 +23,9 @@ module Build
 
         Build.configure do |config|
           config.host           = Build.api_host
+          config.scheme         = Build.api_host_scheme
           config.access_token   = user_token
-          # config.debugging      = true
+          config.debugging      = Build.debugging?
         end
 
         # Configure the API client
