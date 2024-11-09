@@ -1,8 +1,14 @@
 # Build CLI
 
+## Build
+
+```bash
+shards build
+```
+
 ## Contributors
 
-- [Matthew Chigira](https://github.com/your-github-user) - creator and maintainer
+- [Matthew Chigira](https://github.com/matthewchigira) - creator and maintainer
 
 ## License
 
