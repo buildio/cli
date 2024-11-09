@@ -10,7 +10,7 @@ shards:
 
   build-client:
     git: https://github.com/buildio/sdk-crystal-lang.git
-    version: 1.0.2+git.commit.b114a1f46f28e035836da40174a8564630d31ca1
+    version: 1.0.4+git.commit.dc7b604281b80a1a8796dab05ffec453fbd499eb
 
   crest:
     git: https://github.com/mamantoha/crest.git
