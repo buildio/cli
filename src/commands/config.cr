@@ -22,6 +22,10 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           # TODO: API v2 should be more than just a hash
           app_name_or_id = input.option("app", type: String)
+          if app_name_or_id.blank?
+            output.puts("<error>   Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
           config_vars    = api.config_vars(app_name_or_id)
           if input.option("json", type: Bool)
             # { "key".colorize(:blue).to_s ":".colorize(:yellow) "value".colorize(:green).to_s }
