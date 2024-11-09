@@ -53,7 +53,7 @@ module Build
           if response.status_code == 200
             json_response = JSON.parse(response.body)
             if json_response["code"].to_s == "unresolved"
-              sleep(1)
+              sleep(Time::Span.new(seconds: poll_interval))
             else
               # puts json_response
               user_token = json_response["token"].to_s
