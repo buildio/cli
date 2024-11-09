@@ -41,7 +41,7 @@ application.add Build::Commands::Config::List.new
 # application.add Build::Commands::Config::Set.new
 # application.add Build::Commands::Config::Delete.new
 
-# application.add Build::Commands::Process::List.new
+application.add Build::Commands::Process::List.new
 application.add Build::Commands::Process::Delete.new
 
 # apps:create  Create a new app
