@@ -3,16 +3,16 @@ require "term-spinner"
 module Build
   module Commands
     module Process
-      @[ACONA::AsCommand("ps")]
+      @[ACONA::AsCommand("ps:list")]
       class List < Base
         protected def configure : Nil
           self
-            .name("ps")
+            .name("ps:list")
             .description("List running processes for an application")
             .option("app", "a", :required, "The ID or NAME of the application")
             .help("List running processes for an application")
             .usage("ps -a <app>")
-            .aliases(["ps:ls", "ps:list"])
+            .aliases(["ps", "ps:ls"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name_or_id = input.option("app", type: String)
