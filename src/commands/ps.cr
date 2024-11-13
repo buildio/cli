@@ -38,9 +38,19 @@ module Build
               # dotiw = (Time.utc - started_at).total_seconds.to_i.seconds
               dotiw = distance_of_time_in_words(started_at)
 
-              output.puts "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " +
+              entry = "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " +
                 "#{started_at.to_s.colorize(:dark_gray)} (~ #{dotiw.colorize.yellow} ago)"
 
+
+              restarts     = process.restarts
+              restarted_at = process.restarted_at
+              if restarted_at && restarts && restarts > 0
+                entry += " #{process.restarts} restarts"
+                restarted_at_time = Time.parse(restarted_at, "%Y-%m-%dT%H:%M:%S.%LZ", location: Time::Location::UTC)
+                dotiw = distance_of_time_in_words(restarted_at_time)
+                entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+              end
+              output.puts entry
             end
             output.puts "" # Line break
           end

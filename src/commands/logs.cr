@@ -18,11 +18,18 @@ module Build
 
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         query_params = {} of String => String
-        app = input.option("app")
-        return ACON::Command::Status::FAILURE if app.nil?
+        app = input.option("app", type: String)
+        return ACON::Command::Status::FAILURE if app.blank?
         process = input.option("process")
         query_params["process"] = process if process
         tail = input.option("tail", type: Bool)
+
+        if tail
+          output.puts("Tailing logs for #{app}... #{tail}") 
+        else
+          output.puts("Fetching logs for #{app}... #{tail}") 
+        end
+
         query_params["tail"] = tail.to_s if tail
         num = input.option("count")
         query_params["num"] = num if num
@@ -38,6 +45,10 @@ module Build
         params = URI::Params.encode(query_params)
         headers = HTTP::Headers.new
         headers["Authorization"] = "Bearer #{user_token}"
+
+        output.puts("Query params: #{query_params}")
+        output.puts("Params: #{params}")
+        exit
 
         log_url_res = HTTP::Client.get(URI.new("https", Build.api_host, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
         if log_url_res.status_code != 200

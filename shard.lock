@@ -10,7 +10,7 @@ shards:
 
   build-client:
     git: https://github.com/buildio/sdk-crystal-lang.git
-    version: 1.0.4+git.commit.dc7b604281b80a1a8796dab05ffec453fbd499eb
+    version: 1.0.6+git.commit.a697305806e68a4efc2a8dbd4fee936ee8bedff6
 
   crest:
     git: https://github.com/mamantoha/crest.git
@@ -30,7 +30,7 @@ shards:
 
   ssh2:
     git: https://github.com/spider-gazelle/ssh2.cr.git
-    version: 1.6.1
+    version: 1.7.0
 
   term-cursor:
     git: https://github.com/crystal-term/cursor.git
