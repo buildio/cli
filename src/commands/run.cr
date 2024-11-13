@@ -61,12 +61,15 @@ module Build
 
           spinner.update(status: "Opening channel")
           session.open_session do |channel|
-            channel.request_pty(
-              "xterm-256color",
-              width: width,
-              height: height,
-            )
+            # This command gets:   ERR -22: Unable to complete request for channel-setenv  
+            channel.request_pty( "xterm-256color", width: width, height: height )
 
+            channel.setenv("TERM", "xterm-256color") # This should be set with the PTY request below.
+            # channel.setenv("PS1", "\[\033[01;34m\]\w\[\033[00m\] \[\033[01;32m\]$ \[\033[00m\]")
+
+            # channel << "export TERM=xterm-256color\n"
+            # export PS1="\[\033[01;34m\]\w\[\033[00m\] \[\033[01;32m\]$ \[\033[00m\]"
+            # channel << "export PS1=\"\\[\\033[01;34m\\]\\w\\[\\033[00m\\] \\[\\033[01;32m\\]\\$ \\[\\033[00m\\]\"\n"
             if command
               spinner.update(status: "Running command")
               channel.command(["/cnb/lifecycle/launcher", *command].join(" "))
