@@ -26,7 +26,7 @@ application.add Build::Commands::Login.new
 application.add Build::Commands::OidcLogin.new
 application.add Build::Commands::Run.new
 application.add Build::Commands::Logs.new
-# application.add Build::Commands::App::Create.new
+application.add Build::Commands::App::Create.new
 application.add Build::Commands::App::List.new
 application.add Build::Commands::App::Info.new
 application.add Build::Commands::Team::List.new
@@ -37,9 +37,9 @@ application.add Build::Commands::Namespace::Create.new
 application.add Build::Commands::Namespace::Delete.new
 
 application.add Build::Commands::Config::List.new
-# application.add Build::Commands::Config::Get.new
-# application.add Build::Commands::Config::Set.new
-# application.add Build::Commands::Config::Delete.new
+application.add Build::Commands::Config::Info.new
+application.add Build::Commands::Config::Create.new
+application.add Build::Commands::Config::Delete.new
 
 application.add Build::Commands::Process::List.new
 application.add Build::Commands::Process::Delete.new
