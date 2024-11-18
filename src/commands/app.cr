@@ -10,7 +10,7 @@ require "netrc"
 # accepts the authorization, the command polls the Build API to get the user's token.
 module Build
   module Commands
-    module App 
+    module App
       @[ACONA::AsCommand("apps:list")]
       class List < Base
         protected def configure : Nil
@@ -64,6 +64,36 @@ module Build
             output.puts app.to_json
           else
             output.puts "App details:"
+            output.puts ""
+            output.puts "  Name: #{app.name}"
+            output.puts "  ID:   #{app.id}"
+          end
+          return ACON::Command::Status::SUCCESS
+        end
+      end
+
+      @[ACONA::AsCommand("apps:create")]
+      class Create < Base
+        protected def configure : Nil
+          self
+            .name("apps:create")
+            .description("Create a new application.")
+            .argument("name", :required, "The name of the app to create.")
+            .option("team", "t", :optional, "The team to create the app in.")
+            .option("region", "r", :optional, "The region (default: #{self.default_region}).")
+            .option("json", "j", :none, "Output in JSON format.")
+            .help("Create a new application.")
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          name = input.argument("name", type: String)
+          team_id = input.option("team", type: String | Nil)
+          region = input.option("region", type: String | Nil) || self.default_region
+          req = CreateAppRequest.new( name: name, team_id: team_id, region: region, description: nil )
+          app = api.create_app(req)
+          if input.option("json", type: Bool)
+            output.puts app.to_json
+          else
+            output.puts "App created:"
             output.puts ""
             output.puts "  Name: #{app.name}"
             output.puts "  ID:   #{app.id}"
