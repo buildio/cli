@@ -61,34 +61,137 @@ module Build
           end
           return ACON::Command::Status::SUCCESS
         end
+      end
 
-#     @[ACONA::AsCommand("apps:info")]
-#     class Info < Base
-#       protected def configure : Nil
-#         self
-#           .name("apps:info")
-#           .description("Show the details of a specific application.")
-#           .argument("app", :optional, "The ID or NAME of the app to show.")
-#           .option("app", "a", :optional, "The app")
-#           .option("json", "j", :none, "Output in JSON format.")
-#       end
-#       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
-#         app_input = input.argument("app", type: String | Nil) || input.option("app", type: String | Nil)
-#         if app_input.nil?
-#           output.puts "You must specify an app ID or NAME."
-#           return ACON::Command::Status::FAILURE
-#         end
-#         app = api.app(app_input)
-#         if input.option("json", type: Bool)
-#           output.puts app.to_json
-#         else
-#           output.puts "App details:"
-#           output.puts ""
-#           output.puts "  Name: #{app.name}"
-#           output.puts "  ID:   #{app.id}"
-#         end
-#         return ACON::Command::Status::SUCCESS
-#       end
+      # Add config:get VARNAME1 VARNAME2 -a antimony-staging 
+      # postgres://ucbr51k32p4sv1j...
+      # rediss://:p660d780c02c93e9b...
+      # config:get DATABASE_URL REDIS_URL -s -a antimony-staging 
+      # DATABASE_URL='postgres://ucbr51k32p4sv1...'
+      # REDIS_URL='rediss://:p660d780c...'
+      @[ACONA::AsCommand("config:get")]
+      class Info < Base
+        protected def configure : Nil
+          self
+            .name("config:get")
+            .usage("config:get KEY... -a my-app")
+            .description("Get the config variables for an app.")
+            .argument("KEY", ACON::Input::Argument::Mode[:required, :is_array], "The name of the config variable(s) to get.")
+            .option("app",   "a", :required, "The name of the application.")
+            .option("shell", "s", :none, "Output in shell format.")
+            .option("json",  "j", :none, "Output in JSON format.")
+            .help("Display the config variables for an app.")
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_name_or_id = input.option("app", type: String)
+          if app_name_or_id.blank?
+            output.puts("<error>   Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          config_vars    = api.config_vars(app_name_or_id)
+          varnames       = input.argument("KEY", type: Array(String))
+          if varnames.empty?
+            output.puts("<error>   Missing required argument KEY</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          if input.option("json", type: Bool)
+            output.puts "{"
+            varnames.each do |varname|
+              value = config_vars[varname]
+              output.puts "  #{varname.to_json}".colorize(:light_blue).to_s + ":".colorize(:light_yellow).to_s + " #{value.to_json},".colorize(:light_green).to_s
+            end
+            output.puts "}"
+          elsif input.option("shell", type: Bool)
+            varnames.each do |varname|
+              value = config_vars[varname]
+              if value.match(/^[0-9a-zA-Z_\-\.]+$/)
+                output.puts "#{varname}=#{value}"
+              else
+                output.puts "#{varname}='#{value.gsub(/'/, "'\\\\''")}'"
+              end
+            end
+          else
+            # Just print them out so this can be used in a script, etc...
+            varnames.each do |varname|
+              value = config_vars[varname]
+              output.puts "#{value}"
+            end
+          end
+          return ACON::Command::Status::SUCCESS
+        end
+      end
+      
+
+      # Add config:set VARNAME1=VALUE1 VARNAME2=VALUE2 -a antimony-staging
+      @[ACONA::AsCommand("config:set")]
+      class Create < Base
+        protected def configure : Nil
+          self
+            .name("config:set")
+            .usage("config:set KEY1=VALUE1 [KEY2=VALUE2 ...] -a my-app")
+            .description("Set a config variable for an app.")
+            .argument("KEY=VALUE", ACON::Input::Argument::Mode[:required, :is_array], "The name and value of the config variable(s) to set.")
+            .option("app", "a", :required, "The name of the application.")
+            .help("Set a config variable for an app.")
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_name_or_id = input.option("app", type: String)
+          if app_name_or_id.blank?
+            output.puts("<error>   Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          varname_values = input.argument("KEY=VALUE", type: Array(String))
+          if varname_values.empty?
+            output.puts("<error>   Must specify KEY and VALUE </error>")
+            return ACON::Command::Status::FAILURE
+          end
+          config_vars = api.config_vars(app_name_or_id)
+          varname_values.each do |varname_value|
+            if varname_value !~ /=/
+              output.puts("<error>   Must be in the format KEY=VALUE</error>")
+              return ACON::Command::Status::FAILURE
+            end
+            varname, value = varname_value.split("=", 2)
+            if varname.blank?
+              output.puts("<error>   #{varname_value} is invalid. Must be in the format KEY=VALUE</error>")
+              return ACON::Command::Status::FAILURE
+            end
+            config_vars[varname] = value
+          end
+          api.set_config_vars(app_name_or_id, config_vars)
+          return ACON::Command::Status::SUCCESS
+        end
+      end
+
+      # Add config:unset VARNAME1 VARNAME2 -a antimony-staging
+      @[ACONA::AsCommand("config:unset")]
+      class Delete < Base
+        protected def configure : Nil
+          self
+            .name("config:unset")
+            .usage("config:unset KEY1 [KEY2 ...] -a my-app")
+            .description("Unset config variables for an app.")
+            .argument("KEY", :required, "The name of the config variable(s) to unset.")
+            .option("app", "a", :required, "The name of the application.")
+            .help("Unset a config variable for an app.")
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_name_or_id = input.option("app", type: String)
+          if app_name_or_id.blank?
+            output.puts("<error>   Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          config_vars = api.config_vars(app_name_or_id)
+          varnames    = input.argument("KEY", type: Array(String))
+          if varnames.empty?
+            output.puts("<error>   Missing required argument VARNAME</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          varnames.each do |varname|
+            api.delete_config_var(app_name_or_id, varname)
+          end
+          return ACON::Command::Status::SUCCESS
+        end
       end
     end
   end
