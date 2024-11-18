@@ -24,11 +24,11 @@ module Build
         query_params["process"] = process if process
         tail = input.option("tail", type: Bool)
 
-        if tail
-          output.puts("Tailing logs for #{app}... #{tail}") 
-        else
-          output.puts("Fetching logs for #{app}... #{tail}") 
-        end
+        # if tail
+        #   output.puts("Tailing logs for #{app}... #{tail}") 
+        # else
+        #   output.puts("Fetching logs for #{app}... #{tail}") 
+        # end
 
         query_params["tail"] = tail.to_s if tail
         num = input.option("count")
@@ -46,10 +46,8 @@ module Build
         headers = HTTP::Headers.new
         headers["Authorization"] = "Bearer #{user_token}"
 
-        output.puts("Query params: #{query_params}")
-        output.puts("Params: #{params}")
-        exit
-
+        # output.puts("Query params: #{query_params}")
+        # output.puts("Params: #{params}")
         log_url_res = HTTP::Client.get(URI.new("https", Build.api_host, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
         if log_url_res.status_code != 200
           output.puts("Failed to get log URL for app #{app}.")
