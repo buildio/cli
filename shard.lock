@@ -22,7 +22,7 @@ shards:
 
   http_proxy:
     git: https://github.com/mamantoha/http_proxy.git
-    version: 0.12.0
+    version: 0.13.0
 
   netrc:
     git: https://github.com/usiegj00/crystal-netrc.git
@@ -30,7 +30,7 @@ shards:
 
   ssh2:
     git: https://github.com/spider-gazelle/ssh2.cr.git
-    version: 1.7.0
+    version: 1.7.1
 
   term-cursor:
     git: https://github.com/crystal-term/cursor.git
