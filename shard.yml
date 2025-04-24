@@ -28,6 +28,6 @@ dependencies:
     github: athena-framework/console
     version: ~> 0.3.5
 
-crystal: '>= 1.12.1'
+crystal: '>= 1.16.1'
 
 license: MIT
