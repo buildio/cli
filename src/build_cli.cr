@@ -43,6 +43,7 @@ application.add Build::Commands::Config::Delete.new
 
 application.add Build::Commands::Process::List.new
 application.add Build::Commands::Process::Delete.new
+application.add Build::Commands::Process::Exec.new
 
 # apps:create  Create a new app
 # config:get   Get a config variable for an app
