@@ -91,6 +91,53 @@ module Build
           return ACON::Command::Status::SUCCESS
         end
       end
+      @[ACONA::AsCommand("ps:exec")]
+      class Exec < Base
+        protected def configure : Nil
+          self
+            .name("ps:exec")
+            .description("Execute a command in a running dyno")
+            .option("app", "a", :required, "The ID or NAME of the application")
+            .option("dyno", "d", :required, "The NAME of the dyno (e.g. web.1) to exec into")
+            .argument("CMD", ACON::Input::Argument::Mode[:required, :is_array], "Command to run inside the dyno")
+            .help("Execute a command in a running dyno")
+            .usage("ps:exec -a <app> -d <dyno> -- ls -l")
+        end
+
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_name_or_id = input.option("app", type: String)
+          dyno_name      = input.option("dyno", type: String)
+
+          if app_name_or_id.blank? || dyno_name.blank?
+            output.puts("<error>   Missing required options --app and/or --dyno</error>")
+            return ACON::Command::Status::FAILURE
+          end
+
+          command_parts = input.argument("CMD", type: Array(String))
+          if command_parts.empty?
+            output.puts("<error>   Missing command to execute</error>")
+            return ACON::Command::Status::FAILURE
+          end
+
+          cmd = command_parts.join(" ")
+          spinner = dots_spinner("Executing '#{cmd}' on #{dyno_name}")
+          begin
+            response_body = exec_dyno(app_name_or_id, dyno_name, cmd)
+            spinner.success
+            output.puts response_body
+            ACON::Command::Status::SUCCESS
+          rescue ex : Exception
+            spinner.error
+            output.puts("<error>   #{ex.message}</error>")
+            ACON::Command::Status::FAILURE
+          end
+        end
+
+        private def exec_dyno(app_id : String, dyno : String, cmd : String) : String
+          result = api.exec_dyno(app_id, dyno, cmd)
+          result.output
+        end
+      end
     end
   end
 end
