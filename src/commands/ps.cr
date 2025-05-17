@@ -134,7 +134,8 @@ module Build
         end
 
         private def exec_dyno(app_id : String, dyno : String, cmd : String) : String
-          result = api.exec_dyno(app_id, dyno, cmd)
+          request = Build::ExecDynoRequest.new(cmd)
+          result  = api.exec_dyno(app_id, dyno, request)
           result.output
         end
       end
