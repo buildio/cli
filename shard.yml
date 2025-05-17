@@ -1,5 +1,5 @@
 name: bld
-version: 0.1.13
+version: 1.0.15
 
 authors:
   - Jonathan Siegel <248302+usiegj00@users.noreply.github.com>
@@ -12,7 +12,7 @@ dependencies:
   build-client:
     github: buildio/sdk-crystal-lang
     branch: main # or specify the correct branch name
-#    version: ~> 1.0.0
+    version: 1.0.15
 
 # Spinner
   term-spinner:
