@@ -21,11 +21,10 @@ module Build
           exit(1)
         end
 
+        # Host, scheme, and debugging are set globally.
+        # We only need to configure the access_token here.
         Build.configure do |config|
-          config.host           = Build.api_host
-          config.scheme         = Build.api_host_scheme
-          config.access_token   = user_token
-          config.debugging      = Build.debugging?
+          config.access_token = user_token
         end
 
         # Configure the API client

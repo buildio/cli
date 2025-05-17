@@ -2,21 +2,56 @@ require "athena-console"
 require "./utils"
 require "./commands/base"
 require "./commands/**"
+require "uri"
 
 VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
 Colorize.on_tty_only! # Don't colorize output if not on a TTY
 
 module Build
-  def self.api_host
-    "app.build.io"
-  end
-  def self.api_host_scheme
-    "https"
-  end
+  private DEFAULT_API_URL = "https://app.build.io"
+
+  # This will now control both CLI debug messages and SDK debugging.
   def self.debugging?
-    false
+    val = ENV["DEBUG"]?
+    val == "true" || val == "1"
+  end
+  def self.api_url
+    ENV.fetch("BUILD_API_URL", DEFAULT_API_URL)
+  end
+
+  def self.parsed_api_uri
+    URI.parse(self.api_url)
+  end
+
+  def self.api_host
+    uri = self.parsed_api_uri
+    uri.host.not_nil! + (uri.port ? ":#{uri.port}" : "")
+  end
+
+  def self.api_host_scheme
+    self.parsed_api_uri.scheme.not_nil!
+  end
+
+  # Method to setup global API client config
+  def self.setup_global_api_config
+    current_host = self.api_host
+    current_scheme = self.api_host_scheme
+    sdk_debugging_flag = self.debugging?
+    if self.debugging?
+      STDERR.puts "[DEBUG] Setting up global API config with:"
+      STDERR.puts "[DEBUG]   Host: #{current_host}"
+      STDERR.puts "[DEBUG]   Scheme: #{current_scheme}"
+      STDERR.puts "[DEBUG]   SDK Debugging: #{sdk_debugging_flag}"
+    end
+    Build.configure do |config|
+      config.host       = current_host
+      config.scheme     = current_scheme
+      config.debugging  = sdk_debugging_flag
+    end
   end
 end
+
+Build.setup_global_api_config # Call it once to configure the API client globally
 
 application = ACON::Application.new "Build.io CLI", version: VERSION
 
