@@ -1,6 +1,6 @@
 ---
 name: bld
-version: 1.0.20
+version: 1.0.21
 authors:
 - Jonathan Siegel <248302+usiegj00@users.noreply.github.com>
 targets:
@@ -9,14 +9,13 @@ targets:
 dependencies:
   build-client:
     github: buildio/sdk-crystal-lang
-    version: 1.0.20
+    version: 1.0.21
   term-spinner:
     github: crystal-term/spinner
   netrc:
     github: usiegj00/crystal-netrc
   ssh2:
     github: usiegj00/ssh2.cr
-    # github: spider-gazelle/ssh2.cr
   athena-console:
     github: athena-framework/console
     version: "~> 0.3.5"
