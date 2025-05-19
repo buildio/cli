@@ -1,33 +1,22 @@
+---
 name: bld
-version: 1.0.15
-
+version: 1.0.18
 authors:
-  - Jonathan Siegel <248302+usiegj00@users.noreply.github.com>
-
+- Jonathan Siegel <248302+usiegj00@users.noreply.github.com>
 targets:
   bld:
     main: src/build_cli.cr
-
 dependencies:
   build-client:
-    github: buildio/sdk-crystal-lang
-    branch: main # or specify the correct branch name
-    version: 1.0.15
-
-# Spinner
+    path: "../sdks/crystal"
   term-spinner:
     github: crystal-term/spinner
-
   netrc:
     github: usiegj00/crystal-netrc
-
   ssh2:
     github: spider-gazelle/ssh2.cr
-
   athena-console:
     github: athena-framework/console
-    version: ~> 0.3.5
-
-crystal: '>= 1.16.1'
-
+    version: "~> 0.3.5"
+crystal: ">= 1.16.1"
 license: MIT
