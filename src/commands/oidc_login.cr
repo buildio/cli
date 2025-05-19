@@ -23,10 +23,10 @@ module Build
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         region = input.option("region")
         unless region
-          output.puts("Please provide a region")
+          output.puts "<error>   Missing required option --region</error>"
           return ACON::Command::Status::FAILURE
         end
-        output.puts api.api_v1_oidc_login_get(region: region).to_json
+        output.puts api.oidc_login(region: region).to_json
         return ACON::Command::Status::SUCCESS
       end
     end

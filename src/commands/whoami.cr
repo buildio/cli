@@ -11,7 +11,7 @@ module Build
       end
 
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
-        output.puts api.api_v1_me_get.email
+        output.puts "#{api.me.email}"
         return ACON::Command::Status::SUCCESS
       end
     end
