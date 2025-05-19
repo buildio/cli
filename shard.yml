@@ -15,7 +15,8 @@ dependencies:
   netrc:
     github: usiegj00/crystal-netrc
   ssh2:
-    github: spider-gazelle/ssh2.cr
+    github: usiegj00/ssh2.cr
+    # github: spider-gazelle/ssh2.cr
   athena-console:
     github: athena-framework/console
     version: "~> 0.3.5"
