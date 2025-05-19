@@ -119,10 +119,9 @@ module Build
             return ACON::Command::Status::FAILURE
           end
 
-          cmd = command_parts.join(" ")
-          spinner = dots_spinner("Executing '#{cmd}' on #{dyno_name}")
+          spinner = dots_spinner("Executing '#{command_parts.join(" ")}' on #{dyno_name}")
           begin
-            response_body = exec_dyno(app_name_or_id, dyno_name, cmd)
+            response_body = exec_dyno(app_name_or_id, dyno_name, command_parts)
             spinner.success
             output.puts response_body
             ACON::Command::Status::SUCCESS
@@ -133,8 +132,8 @@ module Build
           end
         end
 
-        private def exec_dyno(app_id : String, dyno : String, cmd : String) : String
-          request = Build::ExecDynoRequest.new(cmd)
+        private def exec_dyno(app_id : String, dyno : String, command_parts : Array(String)) : String
+          request = Build::DynoExecRequest.new(command_parts)
           result  = api.exec_dyno(app_id, dyno, request)
           result.output
         end
