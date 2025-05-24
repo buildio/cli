@@ -9,6 +9,7 @@ module Build
           self
             .name("pipelines:list")
             .description("list your pipelines")
+            .option("team", "t", :optional, "Team.")
             .option("json", "j", :none, "Output in JSON format")
             .help("Lists pipelines accessible to the current user")
             .aliases(["pipelines"])
@@ -16,8 +17,8 @@ module Build
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api  # Ensure authentication is set up
-          pipelines_api = Build::PipelinesApi.new
-          pipelines = pipelines_api.list_pipelines
+          team_id = input.option("team", type: String | Nil)
+          pipelines = list_pipelines_with_team(team_id)
 
           if input.option("json", type: Bool)
             output.puts pipelines.to_json
@@ -25,9 +26,14 @@ module Build
             if pipelines.empty?
               output.puts("You have no pipelines.")
             else
-              output.puts("=== Pipelines")
+              if team_id
+                output.puts("Pipelines for team #{team_id}:")
+              else
+                output.puts("Pipelines you have access to:")
+              end
+              output.puts("")
               pipelines.each do |pipeline|
-                output.puts("#{pipeline.name}")
+                output.puts("  #{pipeline.name} (#{pipeline.id})")
               end
             end
           end
