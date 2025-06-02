@@ -83,11 +83,6 @@ application.add Build::Commands::Process::Exec.new
 application.add Build::Commands::Pipeline::List.new
 application.add Build::Commands::Pipeline::Info.new
 
-application.add Build::Commands::ReviewApps::List.new
-application.add Build::Commands::ReviewApps::Create.new
-application.add Build::Commands::ReviewApps::Info.new
-application.add Build::Commands::ReviewApps::Delete.new
-
 # Run the application.
 # By default this uses STDIN and STDOUT for its input and output.
 application.run
