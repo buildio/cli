@@ -1,6 +1,6 @@
 ---
 name: bld
-version: 1.0.25
+version: 1.0.26
 authors:
 - Matthew Chigira <248302+matthewchigira@users.noreply.github.com>
 targets:
@@ -9,7 +9,7 @@ targets:
 dependencies:
   build-client:
     github: buildio/sdk-crystal-lang
-    version: 1.0.25
+    version: 1.0.26
   term-spinner:
     github: crystal-term/spinner
   netrc:
