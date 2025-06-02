@@ -41,6 +41,7 @@ module Build
         header_params = Hash(String, String).new
         header_params["Accept"] = "application/json"
 
+        cookie_params = Hash(String, String).new
         form_params = Hash(Symbol, (String | ::File)).new
         post_body = nil
         auth_names = ["bearer"]
@@ -54,6 +55,7 @@ module Build
           auth_names,
           header_params,
           query_params,
+          cookie_params,
           form_params
         )
 
