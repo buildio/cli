@@ -9,7 +9,6 @@ module Build
           self
             .name("pipelines:list")
             .description("list your pipelines")
-            .option("team", "t", :optional, "Team.")
             .option("json", "j", :none, "Output in JSON format")
             .help("Lists pipelines accessible to the current user")
             .aliases(["pipelines"])
@@ -17,24 +16,18 @@ module Build
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api  # Ensure authentication is set up
-          team_id = input.option("team", type: String | Nil)
-          pipelines = list_pipelines_with_team(team_id)
+          pipelines_api = Build::PipelinesApi.new
+          pipelines = pipelines_api.list_pipelines.sort_by(&.name)
 
           if input.option("json", type: Bool)
             output.puts pipelines.to_json
           else
-            if pipelines.empty?
-              output.puts("You have no pipelines.")
-            else
-              if team_id
-                output.puts("Pipelines for team #{team_id}:")
-              else
-                output.puts("Pipelines you have access to:")
-              end
-              output.puts("")
-              pipelines.each do |pipeline|
-                output.puts("  #{pipeline.name} (#{pipeline.id})")
-              end
+            output.puts("=== Pipelines")
+            output.puts("")
+            pipelines.each do |pipeline|
+              colored_symbol = "►".colorize.fore(46_u8).dim
+              pipeline_name_colored = pipeline.name.colorize.fore(46_u8).dim
+              output.puts("#{colored_symbol} #{pipeline_name_colored}")
             end
           end
 
@@ -61,15 +54,44 @@ module Build
           pipeline_id = input.argument("pipeline", type: String)
           pipelines_api = Build::PipelinesApi.new
           pipeline = pipelines_api.get_pipeline(pipeline_id)
+          apps = pipelines_api.list_pipeline_apps(pipeline_id).sort_by(&.name)
 
           if input.option("json", type: Bool)
-            output.puts pipeline.to_json
+            output.puts({pipeline: pipeline, apps: apps}.to_json)
           else
-            output.puts("=== #{pipeline.name}")
-            output.puts("ID:      #{pipeline.id}")
-            output.puts("Team:    #{pipeline.team.name}")
-            output.puts("Created: #{pipeline.created_at}")
-            output.puts("Updated: #{pipeline.updated_at}")
+            output.puts("#{"===".colorize(:light_gray)} #{pipeline.name.colorize.bold}")
+            output.puts("")
+            output.puts("owner: #{pipeline.team.name} (team)")
+            output.puts("")
+            
+            if apps.empty?
+              output.puts("No apps found in this pipeline.")
+            else
+              # Sort by stage priority (review, staging, production), then by name
+              stage_order = {"production" => 4, "staging" => 3, "development" => 2, "review" => 1}
+              sorted_apps = apps.sort_by { |app| 
+                stage = app.pipeline_stage || "unknown"
+                stage_priority = stage_order[stage]? || 99
+                {stage_priority, app.name}
+              }
+              
+              # Calculate column width for app names - match Heroku's 33 char width
+              name_width = 33
+              stage_width = 10
+              
+              output.puts((" app name".ljust(name_width) + " stage".ljust(stage_width)).colorize.bold)
+              output.puts(" " + "─" * (name_width - 1) + " " + "─" * stage_width)
+              
+              sorted_apps.each do |app|
+                stage = app.pipeline_stage || "unknown"
+                app_name_part = " ⬢ #{app.name}".colorize.fore(104_u8)
+                stage_part = stage.ljust(stage_width)
+                # Calculate padding needed after the colored app name
+                visible_length = 2 + app.name.size  # " ⬢ " + name length
+                padding = " " * (name_width - visible_length)
+                output.puts("#{app_name_part}#{padding}#{stage_part}")
+              end
+            end
           end
 
           ACON::Command::Status::SUCCESS
