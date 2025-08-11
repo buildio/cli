@@ -11,7 +11,7 @@ build:
 	mkdir -p $(BINDIR)
 	docker build -t bld-cli-build .
 	# sh -c "shards build --release --production --no-debug --static bld -o $(BINARY); strip $(BINARY);"
-	docker run -it --rm --platform linux/amd64 -v "$(PWD):/workspace" bld-cli-build \
+	docker run --rm --platform linux/amd64 -v "$(PWD):/workspace" bld-cli-build \
 	sh -c "shards check || shards install --production --frozen && crystal build src/build_cli.cr --release --no-debug --static -o $(BINDIR)$(BINARY); strip $(BINDIR)$(BINARY);"
 
 # Create a release and upload the zipped binary
