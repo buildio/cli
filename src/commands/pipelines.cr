@@ -73,6 +73,21 @@ module Build
             output.puts("owner: #{pipeline.team.name} (team)")
             output.puts("")
             
+            # Display environments if present
+            if pipeline.responds_to?(:environments) && pipeline.environments
+              envs = pipeline.environments
+              if envs && !envs.empty?
+                output.puts("Environments:")
+                envs.each do |env|
+                  if env.responds_to?(:kind) && env.responds_to?(:id)
+                    kind_display = env.kind.to_s.upcase
+                    output.puts("  #{kind_display}: #{env.id}")
+                  end
+                end
+                output.puts("")
+              end
+            end
+            
             if apps.empty?
               output.puts("No apps found in this pipeline.")
             else
