@@ -8,7 +8,8 @@ targets:
     main: src/build_cli.cr
 dependencies:
   build-client:
-    path: ../sdks/crystal
+    github: buildio/sdk-crystal-lang
+    version: ~> 1.1.1
   term-spinner:
     github: crystal-term/spinner
   netrc:
