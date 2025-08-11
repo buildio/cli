@@ -33,7 +33,16 @@ module Build
 
           ACON::Command::Status::SUCCESS
         rescue ex : Exception
-          output.puts ">".colorize(:red).to_s + "   Error: #{ex.message}"
+          error_msg = ex.message || ""
+          if error_msg.blank? || error_msg == ""
+            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
+            output.puts "      1. Is the server running? (rails server)"
+            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
+            output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
+            output.puts "      Debug: #{ex.class.name}"
+          else
+            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
+          end
           ACON::Command::Status::FAILURE
         end
       end
@@ -96,7 +105,16 @@ module Build
 
           ACON::Command::Status::SUCCESS
         rescue ex : Exception
-          output.puts ">".colorize(:red).to_s + "   Error: #{ex.message}"
+          error_msg = ex.message || ""
+          if error_msg.blank? || error_msg == ""
+            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
+            output.puts "      1. Is the server running? (rails server)"
+            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
+            output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
+            output.puts "      Debug: #{ex.class.name}"
+          else
+            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
+          end
           ACON::Command::Status::FAILURE
         end
       end
