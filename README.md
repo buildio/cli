@@ -14,7 +14,7 @@ The repository includes a GitHub Action (`.github/workflows/build-linux-binary.y
 - **Purpose**: Creates a completely static Linux binary using Alpine Linux for maximum portability
 - **Use Cases**:
   - Provides an easy-to-use binary for Linux users without Crystal dependencies
-  - Serves as a dependency for the Build CLI Heroku buildpack
+  - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
 - **Trigger**: Automatically runs when pushing tags like `v1.1.6`
 - **Build Process**: Uses Docker with Alpine Linux base image to create a fully static binary with all dependencies compiled in
 - **Output**: Releases a `bld-linux-amd64.zip` file containing the static binary
