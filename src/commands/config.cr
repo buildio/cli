@@ -99,10 +99,10 @@ module Build
         protected def configure : Nil
           self
             .name("config:get")
-            .usage("config:get KEY... -a my-app  OR  -e ENV-ID")
+            .usage("config:get KEY... -a my-app  OR  config:get KEY... -e ENV-ID")
             .description("Get the config variables for an app or environment.")
             .argument("KEY", ACON::Input::Argument::Mode[:required, :is_array], "The name of the config variable(s) to get.")
-            .option("app",   "a", :optional, "The name of the application.")
+            .option("app", "a", :optional, "The name of the application.")
             .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
             .option("shell", "s", :none, "Output in shell format.")
             .option("json",  "j", :none, "Output in JSON format.")
