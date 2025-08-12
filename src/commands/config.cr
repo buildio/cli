@@ -99,23 +99,48 @@ module Build
         protected def configure : Nil
           self
             .name("config:get")
-            .usage("config:get KEY... -a my-app")
-            .description("Get the config variables for an app.")
+            .usage("config:get KEY... -a my-app  OR  -e ENV-ID")
+            .description("Get the config variables for an app or environment.")
             .argument("KEY", ACON::Input::Argument::Mode[:required, :is_array], "The name of the config variable(s) to get.")
-            .option("app",   "a", :required, "The name of the application.")
+            .option("app",   "a", :optional, "The name of the application.")
+            .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
             .option("shell", "s", :none, "Output in shell format.")
             .option("json",  "j", :none, "Output in JSON format.")
-            .help("Display the config variables for an app.")
+            .help("Display the config variables for an app or environment.")
         end
         
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           begin
-            app_name_or_id = input.option("app", type: String)
-            if app_name_or_id.blank?
-              output.puts("<error>   Missing required option --app</error>")
+            app_name_or_id = input.option("app", type: String?)
+            env_id = input.option("environment", type: String?)
+            
+            if (app_name_or_id.nil? || app_name_or_id.blank?) && (env_id.nil? || env_id.blank?)
+              output.puts("<error>   Missing required option --app or --environment</error>")
               return ACON::Command::Status::FAILURE
             end
-            config_vars = api.config_vars(app_name_or_id)
+            
+            if !(app_name_or_id.nil? || app_name_or_id.blank?) && !(env_id.nil? || env_id.blank?)
+              output.puts("<error>   Cannot specify both --app and --environment</error>")
+              return ACON::Command::Status::FAILURE
+            end
+            
+            config_vars = if env_id && !env_id.blank?
+              # Use environment endpoint
+              response = api.api_v1_environments_id_get(env_id)
+              # Convert response to Hash(String, String)
+              if response.is_a?(Hash)
+                Hash(String, String).new.tap do |h|
+                  response.each do |k, v|
+                    h[k.to_s] = v.to_s
+                  end
+                end
+              else
+                Hash(String, String).new
+              end
+            else
+              api.config_vars(app_name_or_id.not_nil!)
+            end
+            
             varnames = input.argument("KEY", type: Array(String))
             if varnames.empty?
               output.puts("<error>   Missing required argument KEY</error>")
