@@ -14,18 +14,18 @@ build:
 	docker run --rm --platform linux/amd64 -v "$(PWD):/workspace" bld-cli-build \
 	sh -c "shards check || shards install --production --frozen && crystal build src/build_cli.cr --release --no-debug --static -o $(BINDIR)$(BINARY); strip $(BINDIR)$(BINARY);"
 
-# Create a release and upload the zipped binary
-release: #build
-	@if [ -z "$(VERSION)" ]; then \
-	    echo "Error: VERSION is not set. Use 'make release VERSION=x.y.z' to specify the version."; \
-	    exit 1; \
-	fi
-	@echo "Releasing version $(VERSION)..."
+# Create a release zip (for local testing or CI)
+release-zip: build
+	@echo "Creating release zip..."
 	@if [ ! -f "$(BINDIR)$(BINARY)" ]; then echo "Binary file $(BINDIR)$(BINARY) does not exist."; false; fi
 	cd $(BINDIR) && zip -j $(ZIPFILE) $(BINARY)
-	@if [ ! -f "$(BINDIR)$(ZIPFILE)" ]; then echo "Failed to create zip file $(BINDIR)$(ZIPFILE)."; false; fi
-	gh release create v$(VERSION) $(BINDIR)$(ZIPFILE) --repo $(REPO) --title "Release v$(VERSION)" --notes "Release of version $(VERSION)";
-	@$(MAKE) clean
+	@if [ ! -f "$(BINDIR)$(ZIPFILE)" ]; then echo "Created zip file $(BINDIR)$(ZIPFILE)."; fi
+
+# Legacy release target (now handled by GitHub Actions)
+release:
+	@echo "Note: Releases are now handled by GitHub Actions."
+	@echo "Push a tag like 'v1.1.6' to trigger the release workflow."
+	@echo "Or use 'make release-zip' to create the zip locally."
 
 # Clean up the zipped file
 clean:
