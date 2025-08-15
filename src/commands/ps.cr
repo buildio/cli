@@ -10,20 +10,32 @@ module Build
             .name("ps:list")
             .description("List running processes for an application")
             .option("app", "a", :required, "The ID or NAME of the application")
+            .option("json", "j", :none, "Output in JSON format")
             .help("List running processes for an application")
-            .usage("ps -a <app>")
+            .usage("ps -a <app> [-j]")
             .aliases(["ps", "ps:ls"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name_or_id = input.option("app", type: String)
+          json_output = input.option("json", type: Bool?) || false
+          
           if app_name_or_id.blank?
             output.puts("<error>   Missing required option --app</error>")
             return ACON::Command::Status::FAILURE
           end
           dynos = api.list_dynos(app_name_or_id)
           unless dynos
-            output.puts("<info>   No processes found for app #{app_name_or_id}</info>")
+            if json_output
+              output.puts("[]")
+            else
+              output.puts("<info>   No processes found for app #{app_name_or_id}</info>")
+            end
             return ACON::Command::Status::FAILURE
+          end
+
+          if json_output
+            output.puts(dynos.to_json)
+            return ACON::Command::Status::SUCCESS
           end
 
           dynos.each do |dyno|
