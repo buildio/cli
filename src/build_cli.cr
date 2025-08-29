@@ -83,6 +83,15 @@ application.add Build::Commands::Process::Exec.new
 application.add Build::Commands::Pipeline::List.new
 application.add Build::Commands::Pipeline::Info.new
 
+# Domain management commands
+application.add Build::Commands::Domains::List.new
+application.add Build::Commands::Domains::Add.new
+application.add Build::Commands::Domains::Remove.new
+application.add Build::Commands::Domains::Clear.new
+application.add Build::Commands::Domains::Info.new
+application.add Build::Commands::Domains::Update.new
+application.add Build::Commands::Domains::Wait.new
+
 # Run the application.
 # By default this uses STDIN and STDOUT for its input and output.
 application.run
