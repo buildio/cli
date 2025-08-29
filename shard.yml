@@ -1,6 +1,6 @@
 ---
 name: bld
-version: 1.0.21
+version: 1.1.9
 authors:
 - Jonathan Siegel <248302+usiegj00@users.noreply.github.com>
 targets:
@@ -9,7 +9,7 @@ targets:
 dependencies:
   build-client:
     github: buildio/sdk-crystal-lang
-    version: 1.0.21
+    version: 1.1.9
   term-spinner:
     github: crystal-term/spinner
   netrc:

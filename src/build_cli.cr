@@ -80,12 +80,8 @@ application.add Build::Commands::Process::List.new
 application.add Build::Commands::Process::Delete.new
 application.add Build::Commands::Process::Exec.new
 
-# apps:create  Create a new app
-# config:get   Get a config variable for an app
-# config:set   Set config variables for an app
-# config:unset Un-Set config variables for an app
-# ps           List all the processes of an app
-# ps:restart   Restart all the processes of an app
+application.add Build::Commands::Pipeline::List.new
+application.add Build::Commands::Pipeline::Info.new
 
 # Run the application.
 # By default this uses STDIN and STDOUT for its input and output.

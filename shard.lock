@@ -10,7 +10,7 @@ shards:
 
   build-client:
     git: https://github.com/buildio/sdk-crystal-lang.git
-    version: 1.0.21
+    version: 1.1.8
 
   crest:
     git: https://github.com/mamantoha/crest.git
@@ -34,9 +34,9 @@ shards:
 
   term-cursor:
     git: https://github.com/crystal-term/cursor.git
-    version: 0.1.0+git.commit.6bbe0a27a423bc4e0239a051afca05fd36b47e0a
+    version: 0.2.0
 
   term-spinner:
     git: https://github.com/crystal-term/spinner.git
-    version: 0.1.0+git.commit.60350f9598335c559a8350d98fb2b9042e53290f
+    version: 0.2.0
 
