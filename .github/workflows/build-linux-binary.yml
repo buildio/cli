@@ -1,0 +1,67 @@
+name: Build Linux Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.1.6)'
+        required: true
+        type: string
+
+jobs:
+  build-linux-binary:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Linux binary
+        run: |
+          make build
+      
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create release zip
+        run: |
+          cd bin/linux-amd64
+          zip -j bld-linux-amd64.zip bld
+      
+      - name: Create or update release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            Release of version ${{ steps.get_version.outputs.VERSION }}
+            
+            ## Linux Binary
+            Download the Linux AMD64 binary from the assets below.
+            
+            ## Installation
+            ```bash
+            # Download and extract
+            curl -L -o bld-linux-amd64.zip https://github.com/buildio/cli/releases/download/v${{ steps.get_version.outputs.VERSION }}/bld-linux-amd64.zip
+            unzip bld-linux-amd64.zip
+            chmod +x bld
+            sudo mv bld /usr/local/bin/
+            ```
+          files: |
+            bin/linux-amd64/bld-linux-amd64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
