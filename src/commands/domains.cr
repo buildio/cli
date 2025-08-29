@@ -21,6 +21,7 @@ module Build
           json_output = input.option("json", type: Bool)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             result = api_instance.list_domains(app_name)
             
@@ -39,57 +40,76 @@ module Build
 
         private def display_domains(output : ACON::Output::Interface, domains : Array(Build::Domain))
           if domains.empty?
-            output.puts "<info>No domains found</info>"
+            output.puts "No domains found"
             return
           end
+          
+          app_name = domains.first.app.try(&.name) || "app"
           
           # Group domains by kind
           platform_domains = domains.select { |d| d.kind == "platform" }
           custom_domains = domains.select { |d| d.kind == "custom" }
           
           if !platform_domains.empty?
-            output.puts "=== <info>Default Domain</info>"
+            gray_equals = "===".colorize(:dark_gray)
+            title = "#{app_name} Build.io Domain".colorize.bold
+            output.puts "#{gray_equals} #{title}"
+            output.puts ""
             platform_domains.each do |domain|
-              display_domain_row(output, domain)
+              output.puts domain.hostname.to_s
             end
             output.puts ""
           end
           
           if !custom_domains.empty?
-            output.puts "=== <info>Custom Domains</info>"
+            gray_equals = "===".colorize(:dark_gray)
+            title = "#{app_name} Custom Domains".colorize.bold
+            output.puts "#{gray_equals} #{title}"
+            output.puts ""
+            
+            # Calculate column widths
+            max_domain_width = custom_domains.map { |d| d.hostname.to_s.size }.max
+            max_domain_width = [max_domain_width, "Domain Name".size].max
+            
+            # Print header - bold white
+            header = " Domain Name".ljust(max_domain_width + 2)
+            header += "DNS Record Type".ljust(17)
+            header += "DNS Target".ljust(55)
+            header += "SNI Endpoint"
+            output.puts header.colorize.bold
+            
+            # Print separator line - bold white
+            separator = " " + "─" * (max_domain_width + 1)
+            separator += "─" * 16 + " "
+            separator += "─" * 54 + " "
+            separator += "─" * 18
+            output.puts separator.colorize.bold
+            
+            # Print each domain - normal text
             custom_domains.each do |domain|
-              display_domain_row(output, domain)
+              row = " #{domain.hostname.to_s.ljust(max_domain_width + 1)}"
+              row += "CNAME".ljust(16) + " "
+              
+              # DNS Target
+              dns_target = domain.cname || ""
+              row += dns_target.to_s.ljust(54) + " "
+              
+              # SNI Endpoint
+              sni_name = ""
+              if sni = domain.sni_endpoint
+                sni_name = sni.name.to_s if sni.responds_to?(:name)
+              end
+              row += sni_name.to_s.ljust(18)
+              
+              output.puts row
             end
           else
-            output.puts "=== <info>Custom Domains</info>"
+            gray_equals = "===".colorize(:dark_gray)
+            title = "#{app_name} Custom Domains".colorize.bold
+            output.puts "#{gray_equals} #{title}"
+            output.puts ""
             output.puts "No custom domains. Add one with: bld domains:add <hostname> -a <app-name>"
           end
-        end
-
-        private def display_domain_row(output : ACON::Output::Interface, domain : Build::Domain)
-          status_text = case domain.status
-                       when "succeeded"
-                         "<fg=green>#{domain.status}</>"
-                       when "pending"
-                         "<fg=yellow>#{domain.status}</>"
-                       when "failed"
-                         "<fg=red>#{domain.status}</>"
-                       else
-                         domain.status.to_s
-                       end
-          
-          line = "#{domain.hostname.to_s.ljust(40)} #{status_text}"
-          
-          if domain.cname
-            line += " CNAME: #{domain.cname}"
-          end
-          
-          if domain.acm_status
-            acm_text = domain.acm_status == "cert issued" ? "<fg=green>#{domain.acm_status}</>" : "<fg=yellow>#{domain.acm_status}</>"
-            line += " ACM: #{acm_text}"
-          end
-          
-          output.puts line
         end
       end
 
@@ -115,6 +135,7 @@ module Build
           json_output = input.option("json", type: Bool)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             request_body = Build::CreateDomainRequest.new(hostname: hostname, cert: cert)
@@ -156,6 +177,7 @@ module Build
           app_name = input.option("app", type: String)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             # First, get the list of domains to find the one with the matching hostname
@@ -192,6 +214,7 @@ module Build
           app_name = input.option("app", type: String)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             # Get all domains for the app
@@ -239,6 +262,7 @@ module Build
           json_output = input.option("json", type: Bool)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
@@ -314,6 +338,7 @@ module Build
           json_output = input.option("json", type: Bool)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
@@ -360,6 +385,7 @@ module Build
           app_name = input.option("app", type: String)
           
           begin
+            api  # Ensure authentication is set up
             api_instance = Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
