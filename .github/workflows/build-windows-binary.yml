@@ -31,9 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if (-not (shards check)) {
-            shards install --production --frozen
-          }
+          shards install --production
         shell: powershell
 
       - name: Build Windows binary
