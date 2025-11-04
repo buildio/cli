@@ -59,7 +59,9 @@ application = ACON::Application.new "Build.io CLI", version: VERSION
 application.add Build::Commands::Whoami.new
 application.add Build::Commands::Login.new
 application.add Build::Commands::OidcLogin.new
+{% unless flag?(:win32) %}
 application.add Build::Commands::Run.new
+{% end %}
 application.add Build::Commands::Logs.new
 application.add Build::Commands::App::Create.new
 application.add Build::Commands::App::List.new
