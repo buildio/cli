@@ -47,17 +47,30 @@ jobs:
           name: Release v${{ steps.get_version.outputs.VERSION }}
           body: |
             Release of version ${{ steps.get_version.outputs.VERSION }}
-            
+
             ## Linux Binary
             Download the Linux AMD64 binary from the assets below.
-            
-            ## Installation
+
+            ### Installation (Linux)
             ```bash
             # Download and extract
             curl -L -o bld-linux-amd64.zip https://github.com/buildio/cli/releases/download/v${{ steps.get_version.outputs.VERSION }}/bld-linux-amd64.zip
             unzip bld-linux-amd64.zip
             chmod +x bld
             sudo mv bld /usr/local/bin/
+            ```
+
+            ## Windows Binary
+            Download the Windows AMD64 binary from the assets below.
+
+            ### Installation (Windows)
+            ```powershell
+            # Download and extract
+            Invoke-WebRequest -Uri "https://github.com/buildio/cli/releases/download/v${{ steps.get_version.outputs.VERSION }}/bld-windows-amd64.zip" -OutFile "bld-windows-amd64.zip"
+            Expand-Archive -Path bld-windows-amd64.zip -DestinationPath .
+
+            # Move to a directory in your PATH (example: C:\Program Files\bld)
+            # Or add the current directory to your PATH
             ```
           files: |
             bin/linux-amd64/bld-linux-amd64.zip
