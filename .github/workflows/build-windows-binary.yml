@@ -29,12 +29,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          shards check || shards install --production --frozen
+          if (-not (shards check)) {
+            shards install --production --frozen
+          }
         shell: powershell
 
       - name: Build Windows binary
         run: |
-          mkdir -p bin/windows-amd64
+          New-Item -ItemType Directory -Force -Path bin/windows-amd64
           crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64/bld.exe
         shell: powershell
 
