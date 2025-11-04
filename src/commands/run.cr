@@ -2,13 +2,16 @@ require "io/console"
 require "uuid"
 require "term-spinner"
 require "netrc"
+{% unless flag?(:win32) %}
 require "ssh2"
+{% end %}
 
-# This command is used to run a once-off dyno on the Build platform. 
+# This command is used to run a once-off dyno on the Build platform.
 # It is useful for running tasks that are not part of a web process .
 # type such as database migrations, console sessions, or one-off scripts.
-# The run command takes a command to run as an argument. The command will 
+# The run command takes a command to run as an argument. The command will
 # be executed in a one-off dyno on the Build platform.
+{% unless flag?(:win32) %}
 module Build
   module Commands
     @[ACONA::AsCommand("run")]
@@ -155,3 +158,4 @@ module Build
     end
   end
 end
+{% end %}
