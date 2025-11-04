@@ -1,0 +1,67 @@
+name: Build Windows Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.1.6)'
+        required: true
+        type: string
+
+jobs:
+  build-windows-binary:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Crystal
+        run: |
+          iwr -useb get.scoop.sh -outfile 'install-scoop.ps1'
+          .\install-scoop.ps1 -RunAsAdmin
+          scoop install crystal
+          crystal --version
+        shell: powershell
+
+      - name: Install dependencies
+        run: |
+          shards check || shards install --production --frozen
+        shell: powershell
+
+      - name: Build Windows binary
+        run: |
+          mkdir -p bin/windows-amd64
+          crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64/bld.exe
+        shell: powershell
+
+      - name: Get version
+        id: get_version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "VERSION=${{ github.event.inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            $tag = "${{ github.ref }}" -replace 'refs/tags/v', ''
+            echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
+          }
+        shell: powershell
+
+      - name: Create release zip
+        run: |
+          Compress-Archive -Path bin/windows-amd64/bld.exe -DestinationPath bin/windows-amd64/bld-windows-amd64.zip
+        shell: powershell
+
+      - name: Upload Windows binary to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          files: |
+            bin/windows-amd64/bld-windows-amd64.zip
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
