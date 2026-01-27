@@ -42,7 +42,7 @@ jobs:
           VER="${{ steps.version.outputs.bare }}"
           SDK_VER="${{ steps.sdk.outputs.version }}"
           sed -i "s/^version: .*/version: ${VER}/" shard.yml
-          sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/}" shard.yml
+          sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/;}" shard.yml
 
       - name: Install Crystal and update lockfile
         uses: crystal-lang/install-crystal@v1
