@@ -6,32 +6,45 @@ module Build
         protected def configure : Nil
           self
             .name("addons")
-            .description("List addons for an app.")
-            .option("app", "a", :required, "App name or ID.")
+            .description("List addons for an app or team.")
+            .option("app", "a", :optional, "App name or ID.")
+            .option("team", "t", :optional, "Team name or ID.")
             .option("json", "j", :none, "Output in JSON format.")
-            .help("List all addons provisioned for an app.")
+            .help("List all addons provisioned for an app or team.")
             .aliases(["addons:list"])
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
-          app_name = input.option("app", type: String)
+          app_name = input.option("app", type: String?)
+          team_name = input.option("team", type: String?)
           json_output = input.option("json", type: Bool)
+
+          if (app_name.nil? || app_name.blank?) && (team_name.nil? || team_name.blank?)
+            output.puts "<error>Specify --app or --team</error>"
+            return ACON::Command::Status::FAILURE
+          end
 
           begin
             api
-            addons_api = Build::AddonsApi.new
-            addons = addons_api.list_app_addons(app_name)
+            if team_name && !team_name.blank?
+              addons = self.list_team_addons(team_name)
+            else
+              addons_api = Build::AddonsApi.new
+              addons = addons_api.list_app_addons(app_name.not_nil!)
+            end
 
+            label = team_name || app_name
             if json_output
               output.puts addons.to_json
             else
               if addons.empty?
-                output.puts "No addons for #{app_name}"
+                output.puts "No addons for #{label}"
               else
                 addons.each do |addon|
                   plan_name = addon.plan.name
                   addon_name = addon.name || addon.id
-                  output.puts "#{addon_name}  (#{plan_name})  #{addon.state}"
+                  app_label = addon.app.name
+                  output.puts "#{addon_name}  (#{plan_name})  #{addon.state}  #{app_label}"
                 end
               end
             end
@@ -40,6 +53,19 @@ module Build
             output.puts "<error>Failed to list addons: #{e.message}</error>"
             return ACON::Command::Status::FAILURE
           end
+        end
+
+        private def list_team_addons(team_name : String) : Array(Build::Addon)
+          path = "/api/v1/teams/#{URI.encode_path(team_name)}/addons"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          data, _status, _headers = api_client.call_api(:GET, path,
+            :"AddonsApi.list_app_addons", "Array(Addon)", nil, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          Array(Build::Addon).from_json(data)
         end
       end
 
@@ -94,38 +120,54 @@ module Build
             .name("addons:info")
             .description("Show info about an addon.")
             .argument("addon", :required, "Addon name or ID.")
-            .option("app", "a", :required, "App name or ID.")
             .option("json", "j", :none, "Output in JSON format.")
-            .help("Show detailed information about an addon.")
+            .help("Show detailed information about an addon, including attachments.")
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
-          app_name = input.option("app", type: String)
           addon_id = input.argument("addon", type: String)
           json_output = input.option("json", type: Bool)
 
           begin
             api
-            addons_api = Build::AddonsApi.new
-            addon = addons_api.get_addon(app_name, addon_id)
+            data = self.fetch_addon_info(addon_id)
 
             if json_output
-              output.puts addon.to_json
+              output.puts data
             else
-              name = addon.name || addon.id
+              parsed = JSON.parse(data)
+              name = parsed["name"]?.try(&.as_s?) || parsed["id"].as_s
               output.puts "=== #{name}"
-              output.puts "Plan:         #{addon.plan.name}"
-              output.puts "Service:      #{addon.addon_service.name}"
-              output.puts "App:          #{addon.app.name}"
-              output.puts "State:        #{addon.state}"
-              if config_vars = addon.config_vars
-                output.puts "Config Vars:  #{config_vars.join(", ")}" unless config_vars.empty?
+              output.puts "Plan:         #{parsed["plan"]["name"]}"
+              output.puts "Service:      #{parsed["addon_service"]["name"]}"
+              output.puts "App:          #{parsed["app"]["name"]}"
+              output.puts "State:        #{parsed["state"]}"
+              if cvs = parsed["config_vars"]?
+                vars = cvs.as_a.map(&.as_s)
+                output.puts "Config Vars:  #{vars.join(", ")}" unless vars.empty?
               end
-              if url = addon.web_url
+              if url = parsed["web_url"]?.try(&.as_s?)
                 output.puts "Web URL:      #{url}" unless url.empty?
               end
-              if price = addon.billed_price
-                output.puts "Price:        #{price}"
+              if price = parsed["billed_price"]?
+                cents = price["cents"]?.try(&.as_i?)
+                unit = price["unit"]?.try(&.as_s?)
+                if cents && unit
+                  output.puts "Price:        $#{"%.2f" % (cents / 100.0)}/#{unit}"
+                end
+              end
+              if attachments = parsed["attachments"]?
+                atts = attachments.as_a
+                unless atts.empty?
+                  output.puts ""
+                  output.puts "=== Attachments"
+                  atts.each do |att|
+                    att_name = att["name"].as_s
+                    app_name = att["app"]["name"].as_s
+                    att_state = att["state"].as_s
+                    output.puts "  #{att_name}  #{app_name}  #{att_state}"
+                  end
+                end
               end
             end
             return ACON::Command::Status::SUCCESS
@@ -133,6 +175,19 @@ module Build
             output.puts "<error>Failed to get addon info: #{e.message}</error>"
             return ACON::Command::Status::FAILURE
           end
+        end
+
+        private def fetch_addon_info(addon_id : String) : String
+          path = "/api/v1/addons/#{URI.encode_path(addon_id)}"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          data, _status, _headers = api_client.call_api(:GET, path,
+            :"UserAddonsApi.show", "String", nil, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          data
         end
       end
 
