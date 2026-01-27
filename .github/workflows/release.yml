@@ -21,13 +21,17 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Only consider clean semver tags (v1.2.3), ignore suffixed ones (v1.2.3e)
+          LATEST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          LATEST="${LATEST:-v0.0.0}"
+          echo "Latest clean tag: $LATEST"
           MAJOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f1)
           MINOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f2)
           PATCH=$(echo "$LATEST" | sed 's/v//' | cut -d. -f3)
           NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
           echo "tag=v${NEXT_VER}" >> $GITHUB_OUTPUT
           echo "bare=${NEXT_VER}" >> $GITHUB_OUTPUT
+          echo "Next version: v${NEXT_VER}"
 
       - name: Fetch latest SDK version
         id: sdk
@@ -36,6 +40,7 @@ jobs:
             "https://raw.githubusercontent.com/buildio/sdk-crystal-lang/main/shard.yml")
           SDK_VER=$(echo "$SDK_SHARD" | grep '^version:' | awk '{print $2}')
           echo "version=$SDK_VER" >> $GITHUB_OUTPUT
+          echo "SDK version: $SDK_VER"
 
       - name: Update shard.yml versions
         run: |
@@ -43,6 +48,8 @@ jobs:
           SDK_VER="${{ steps.sdk.outputs.version }}"
           sed -i "s/^version: .*/version: ${VER}/" shard.yml
           sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/;}" shard.yml
+          echo "Updated shard.yml:"
+          head -15 shard.yml
 
       - name: Install Crystal and update lockfile
         uses: crystal-lang/install-crystal@v1
