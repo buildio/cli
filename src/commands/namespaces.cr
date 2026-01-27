@@ -64,6 +64,7 @@ module Build
             .name("namespaces:create")
             .description("Create a new namespace")
             .argument("name", :required, "The name of the namespace")
+            .option("zone", "z", :required, "The zone ID.")
             .option("team", "t", :optional, "The team ID or name (default: personal).")
             .option("region", "r", :optional, "The region (default: #{self.default_region}).")
             .option("json", "j", :none, "Output in JSON format.")
@@ -72,27 +73,22 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
 
           region = input.option("region", type: String | Nil) || self.default_region
+          zone_id = input.option("zone", type: String)
           name = input.argument("name")
           raise "Name must be a string" unless name.is_a?(String)
 
-          #namespace = api.create_namespace(
-          #  name: name,
-          #  team_id: input.option("team", type: String | Nil),
-          #  description: nil,
-          #  region: region
-          #)
           req = CreateNamespaceRequest.new(
             name: name,
+            zone_id: zone_id,
             team_id: input.option("team", type: String | Nil),
             description: nil,
             region: region
           )
-          namespace = api.create_namespace(req)
-          
+          api.create_namespace(req)
           if input.option("json", type: Bool)
-            output.puts namespace.to_json
+            output.puts({name: name, zone_id: zone_id, region: region}.to_json)
           else
-            output.puts "Namespace created: #{namespace.name} (#{namespace.id})"
+            output.puts "Namespace created: #{name}"
           end
           return ACON::Command::Status::SUCCESS
         end

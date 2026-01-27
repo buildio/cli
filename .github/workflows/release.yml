@@ -1,0 +1,68 @@
+name: Release CLI
+
+on:
+  repository_dispatch:
+    types: [sdk-updated]
+  workflow_dispatch:
+
+concurrency:
+  group: cli-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Determine next version
+        id: version
+        run: |
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          MAJOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f1)
+          MINOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f2)
+          PATCH=$(echo "$LATEST" | sed 's/v//' | cut -d. -f3)
+          NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "tag=v${NEXT_VER}" >> $GITHUB_OUTPUT
+          echo "bare=${NEXT_VER}" >> $GITHUB_OUTPUT
+
+      - name: Fetch latest SDK version
+        id: sdk
+        run: |
+          SDK_SHARD=$(curl -sL -H "Authorization: token ${{ secrets.RELEASE_PAT }}" \
+            "https://raw.githubusercontent.com/buildio/sdk-crystal-lang/main/shard.yml")
+          SDK_VER=$(echo "$SDK_SHARD" | grep '^version:' | awk '{print $2}')
+          echo "version=$SDK_VER" >> $GITHUB_OUTPUT
+
+      - name: Update shard.yml versions
+        run: |
+          VER="${{ steps.version.outputs.bare }}"
+          SDK_VER="${{ steps.sdk.outputs.version }}"
+          sed -i "s/^version: .*/version: ${VER}/" shard.yml
+          sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/}" shard.yml
+
+      - name: Install Crystal and update lockfile
+        uses: crystal-lang/install-crystal@v1
+      - run: shards update
+
+      - name: Commit, tag, and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shard.yml shard.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "Release ${{ steps.version.outputs.tag }}, SDK ${{ steps.sdk.outputs.version }}"
+          fi
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin main --tags
+
+      - name: Dispatch to Homebrew
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RELEASE_PAT }}
+          repository: buildio/homebrew-cli
+          event-type: cli-released
+          client-payload: '{"tag": "${{ steps.version.outputs.tag }}"}'
