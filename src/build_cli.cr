@@ -85,6 +85,14 @@ application.add Build::Commands::Process::Exec.new
 application.add Build::Commands::Pipeline::List.new
 application.add Build::Commands::Pipeline::Info.new
 
+# Addon management commands
+application.add Build::Commands::Addons::List.new
+application.add Build::Commands::Addons::Create.new
+application.add Build::Commands::Addons::Info.new
+application.add Build::Commands::Addons::Destroy.new
+application.add Build::Commands::Addons::Attach.new
+application.add Build::Commands::Addons::Detach.new
+
 # Domain management commands
 application.add Build::Commands::Domains::List.new
 application.add Build::Commands::Domains::Add.new
