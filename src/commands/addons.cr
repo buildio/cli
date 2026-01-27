@@ -78,6 +78,7 @@ module Build
             .argument("plan", :required, "Addon service and plan (e.g. bld-postgres:essential-0).")
             .option("app", "a", :required, "App name or ID.")
             .option("name", nil, :optional, "Custom name for the addon.")
+            .option("config", "c", ACON::Input::Option::Value[:optional, :is_array], "Config key=value (repeatable).")
             .option("json", "j", :none, "Output in JSON format.")
             .help("Provision a new addon for an app.")
         end
@@ -86,12 +87,22 @@ module Build
           app_name = input.option("app", type: String)
           plan = input.argument("plan", type: String)
           addon_name = input.option("name", type: String?)
+          config_opts = input.option("config", type: Array(String))
           json_output = input.option("json", type: Bool)
+
+          config = nil.as(Hash(String, JSON::Any)?)
+          unless config_opts.empty?
+            config = Hash(String, JSON::Any).new
+            config_opts.each do |opt|
+              k, _, v = opt.partition('=')
+              config.not_nil![k] = JSON::Any.new(v)
+            end
+          end
 
           begin
             api
             addons_api = Build::AddonsApi.new
-            req = Build::CreateAddonRequest.new(plan: plan, name: addon_name, config: nil)
+            req = Build::CreateAddonRequest.new(plan: plan, name: addon_name, config: config)
             addon = addons_api.create_addon(app_name, req)
 
             if json_output
