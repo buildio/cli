@@ -18,21 +18,6 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
 
-      - name: Determine next version
-        id: version
-        run: |
-          # Only consider clean semver tags (v1.2.3), ignore suffixed ones (v1.2.3e)
-          LATEST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          LATEST="${LATEST:-v0.0.0}"
-          echo "Latest clean tag: $LATEST"
-          MAJOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f1)
-          MINOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f2)
-          PATCH=$(echo "$LATEST" | sed 's/v//' | cut -d. -f3)
-          NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          echo "tag=v${NEXT_VER}" >> $GITHUB_OUTPUT
-          echo "bare=${NEXT_VER}" >> $GITHUB_OUTPUT
-          echo "Next version: v${NEXT_VER}"
-
       - name: Fetch latest SDK version from tag
         id: sdk
         run: |
@@ -43,29 +28,46 @@ jobs:
           echo "version=$SDK_VER" >> $GITHUB_OUTPUT
           echo "SDK version: $SDK_VER"
 
-      - name: Update shard.yml versions
-        run: |
-          VER="${{ steps.version.outputs.bare }}"
-          SDK_VER="${{ steps.sdk.outputs.version }}"
-          sed -i "s/^version: .*/version: ${VER}/" shard.yml
-          sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/;}" shard.yml
-          echo "Updated shard.yml:"
-          head -15 shard.yml
-
       - name: Install Crystal and update lockfile
         uses: crystal-lang/install-crystal@v1
       - run: shards update
 
       - name: Commit, tag, and push
+        env:
+          SDK_VER: ${{ steps.sdk.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Pull latest and re-fetch tags to avoid race conditions
+          git fetch --tags
+          git pull --rebase origin main
+
+          # Determine version after pull (in case another release just happened)
+          LATEST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          LATEST="${LATEST:-v0.0.0}"
+          MAJOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f1)
+          MINOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f2)
+          PATCH=$(echo "$LATEST" | sed 's/v//' | cut -d. -f3)
+          NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "Next version: $NEXT_TAG"
+
+          # Update shard.yml with fresh version
+          sed -i "s/^version: .*/version: ${NEXT_VER}/" shard.yml
+          sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/;}" shard.yml
+          echo "Updated shard.yml:"
+          head -15 shard.yml
+
           git add shard.yml shard.lock
           if ! git diff --cached --quiet; then
-            git commit -m "Release ${{ steps.version.outputs.tag }}, SDK ${{ steps.sdk.outputs.version }}"
+            git commit -m "Release ${NEXT_TAG}, SDK ${SDK_VER}"
           fi
-          git tag "${{ steps.version.outputs.tag }}"
+          git tag "${NEXT_TAG}"
           git push origin main --tags
+
+          # Export for downstream steps
+          echo "RELEASE_TAG=${NEXT_TAG}" >> $GITHUB_ENV
 
       - name: Dispatch to Homebrew
         uses: peter-evans/repository-dispatch@v3
@@ -73,4 +75,4 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
           repository: buildio/homebrew-cli
           event-type: cli-released
-          client-payload: '{"tag": "${{ steps.version.outputs.tag }}"}'
+          client-payload: '{"tag": "${{ env.RELEASE_TAG }}"}'
