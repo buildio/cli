@@ -52,17 +52,18 @@ module Build
 
         app = self.api.app(app_id)
 
-        region = app.region
+        ssh_host = app.ssh_host
+        ssh_port = app.ssh_port
         spinner.update(status: "Connecting to server")
-        
+
         if verbose
           output.puts "Verbose mode enabled"
-          output.puts "Connecting to ssh.#{region}.antimony.io:1849"
+          output.puts "Connecting to #{ssh_host}:#{ssh_port}"
           output.puts "App: #{app.name}"
           output.puts "Terminal size: #{width}x#{height}"
         end
 
-        SSH2::Session.open("ssh.#{region}.antimony.io", 1849) do |session|
+        SSH2::Session.open(ssh_host, ssh_port) do |session|
           spinner.update(status: "Logging in")
           if verbose
             output.puts "SSH connection established"
