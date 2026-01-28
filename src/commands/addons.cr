@@ -92,12 +92,12 @@ module Build
           config_opts = input.option("config", type: Array(String))
           json_output = input.option("json", type: Bool)
 
-          config = nil.as(Hash(String, JSON::Any)?)
+          config = nil.as(Hash(String, Object)?)
           unless config_opts.empty?
-            config = Hash(String, JSON::Any).new
+            config = Hash(String, Object).new
             config_opts.each do |opt|
               k, _, v = opt.partition('=')
-              config.not_nil![k] = JSON::Any.new(v)
+              config.not_nil![k] = v.as(Object)
             end
           end
 
