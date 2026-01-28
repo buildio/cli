@@ -18,6 +18,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
 
+      - name: Pull latest to avoid race conditions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch --tags
+          git pull --rebase origin main
+
       - name: Fetch latest SDK version from tag
         id: sdk
         run: |
@@ -28,22 +35,9 @@ jobs:
           echo "version=$SDK_VER" >> $GITHUB_OUTPUT
           echo "SDK version: $SDK_VER"
 
-      - name: Install Crystal and update lockfile
-        uses: crystal-lang/install-crystal@v1
-      - run: shards update
-
-      - name: Commit, tag, and push
-        env:
-          SDK_VER: ${{ steps.sdk.outputs.version }}
+      - name: Determine next version
+        id: version
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Pull latest and re-fetch tags to avoid race conditions
-          git fetch --tags
-          git pull --rebase origin main
-
-          # Determine version after pull (in case another release just happened)
           LATEST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           LATEST="${LATEST:-v0.0.0}"
           MAJOR=$(echo "$LATEST" | sed 's/v//' | cut -d. -f1)
@@ -51,14 +45,29 @@ jobs:
           PATCH=$(echo "$LATEST" | sed 's/v//' | cut -d. -f3)
           NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           NEXT_VER="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "tag=${NEXT_TAG}" >> $GITHUB_OUTPUT
+          echo "bare=${NEXT_VER}" >> $GITHUB_OUTPUT
           echo "Next version: $NEXT_TAG"
 
-          # Update shard.yml with fresh version
-          sed -i "s/^version: .*/version: ${NEXT_VER}/" shard.yml
+      - name: Update shard.yml
+        env:
+          SDK_VER: ${{ steps.sdk.outputs.version }}
+          CLI_VER: ${{ steps.version.outputs.bare }}
+        run: |
+          sed -i "s/^version: .*/version: ${CLI_VER}/" shard.yml
           sed -i "/build-client/{n;n;s/version: .*/version: ${SDK_VER}/;}" shard.yml
           echo "Updated shard.yml:"
           head -15 shard.yml
 
+      - name: Install Crystal and update lockfile
+        uses: crystal-lang/install-crystal@v1
+      - run: shards update
+
+      - name: Commit, tag, and push
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.tag }}
+          SDK_VER: ${{ steps.sdk.outputs.version }}
+        run: |
           git add shard.yml shard.lock
           if ! git diff --cached --quiet; then
             git commit -m "Release ${NEXT_TAG}, SDK ${SDK_VER}"
