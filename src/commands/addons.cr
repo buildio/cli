@@ -78,6 +78,7 @@ module Build
             .argument("plan", :required, "Addon service and plan (e.g. bld-postgres:essential-0).")
             .option("app", "a", :required, "App name or ID.")
             .option("name", nil, :optional, "Custom name for the addon.")
+            .option("description", "d", :optional, "Description for the addon.")
             .option("config", "c", ACON::Input::Option::Value[:optional, :is_array], "Config key=value (repeatable).")
             .option("json", "j", :none, "Output in JSON format.")
             .help("Provision a new addon for an app.")
@@ -87,6 +88,7 @@ module Build
           app_name = input.option("app", type: String)
           plan = input.argument("plan", type: String)
           addon_name = input.option("name", type: String?)
+          addon_description = input.option("description", type: String?)
           config_opts = input.option("config", type: Array(String))
           json_output = input.option("json", type: Bool)
 
@@ -102,7 +104,7 @@ module Build
           begin
             api
             addons_api = Build::AddonsApi.new
-            req = Build::CreateAddonRequest.new(plan: plan, name: addon_name, config: config)
+            req = Build::CreateAddonRequest.new(plan: plan, name: addon_name, description: addon_description, config: config)
             addon = addons_api.create_addon(app_name, req)
 
             if json_output
@@ -149,6 +151,9 @@ module Build
               parsed = JSON.parse(data)
               name = parsed["name"]?.try(&.as_s?) || parsed["id"].as_s
               output.puts "=== #{name}"
+              if desc = parsed["description"]?.try(&.as_s?)
+                output.puts "Description:  #{desc}" unless desc.empty?
+              end
               output.puts "Plan:         #{parsed["plan"]["name"]}"
               output.puts "Service:      #{parsed["addon_service"]["name"]}"
               output.puts "App:          #{parsed["app"]["name"]}"
