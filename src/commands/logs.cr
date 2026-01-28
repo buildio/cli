@@ -14,6 +14,7 @@ module Build
           .option("tail", "t", :none, "Tail the logs.")
           .option("count", "c", :optional, "Number of lines to display.")
           .option("source", "s", :optional, "The log source to display from (app or build).")
+          .option("zone", "z", :optional, "The zone to retrieve logs from.")
       end
 
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -35,6 +36,8 @@ module Build
         query_params["num"] = num if num
         source = input.option("source")
         query_params["source"] = source if source
+        zone = input.option("zone")
+        query_params["zone"] = zone if zone
 
         user_token = Netrc.read[Build.api_host].try &.password
         if user_token.nil?
