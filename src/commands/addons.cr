@@ -153,6 +153,9 @@ module Build
               parsed = JSON.parse(data)
               name = parsed["name"]?.try(&.as_s?) || parsed["id"].as_s
               output.puts "=== #{name}"
+              if human_name = parsed["human_name"]?.try(&.as_s?)
+                output.puts "Display Name: #{human_name}" unless human_name.empty?
+              end
               if desc = parsed["description"]?.try(&.as_s?)
                 output.puts "Description:  #{desc}" unless desc.empty?
               end
