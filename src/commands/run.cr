@@ -129,7 +129,8 @@ module Build
             channel.handle_extended_data(LibSSH2::ExtendedData::MERGE)
 
             if !command_array.empty?
-              spinner.update(status: "Running command")
+              # Build display command (what user sees) vs execution command
+              display_cmd = command_array.join(" ")
               cmd_string = if command_array.size == 1
                 # Single argument: pass through as-is
                 # This allows `bld run "rake test"` to work like `bld run rake test`
@@ -149,12 +150,13 @@ module Build
               if exit_code_mode
                 cmd_string = "#{cmd_string}; echo \"#{EXIT_CODE_SENTINEL} $?\""
               end
+              spinner.update(status: "Running #{display_cmd} on #{app.name}")
               if verbose
                 output.puts "Executing command: #{cmd_string}"
               end
               channel.command(cmd_string)
             else
-              spinner.update(status: "Starting shell")
+              spinner.update(status: "Starting shell on #{app.name}")
               if verbose
                 output.puts "Starting interactive shell"
               end
