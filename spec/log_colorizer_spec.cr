@@ -40,6 +40,14 @@ describe Build::LogColorizer do
       result3.should contain("\e[36m") # cyan for web header
     end
 
+    it "matches alphanumeric instance IDs" do
+      c = Build::LogColorizer.new
+      line = "2024-01-15T10:30:00+00:00 app[web.2c9rh]: State changed from starting to up"
+      result = c.colorize(line)
+      result.should contain(c_fg("starting", 93))
+      result.should contain(c_fg("up", 92))
+    end
+
     it "assigns same color to same base identifier" do
       c = Build::LogColorizer.new
       line1 = "ts app[worker.1]: a"
