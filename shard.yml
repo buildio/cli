@@ -1,6 +1,6 @@
 ---
 name: bld
-version: 1.1.32
+version: 1.1.33
 authors:
 - Matthew Chigira <248302+matthewchigira@users.noreply.github.com>
 targets:
