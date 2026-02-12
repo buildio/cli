@@ -1,8 +1,9 @@
 module Build
   class LogColorizer
-    # Regex to parse log lines: header[identifier.N]: body
+    # Regex to parse log lines: header[identifier.suffix]: body
     # e.g. "2024-01-15T10:30:00+00:00 app[web.1]: Starting process..."
-    LINE_REGEX = /^(.*?\[([\w\-]+)(?:[\d.]+)?\]:)(.*)?$/
+    # e.g. "2024-01-15T10:30:00+00:00 app[web.2c9rh]: Starting process..."
+    LINE_REGEX = /^(.*?\[([\w\-]+)(?:[.\w]+)?\]:)(.*)?$/
 
     # Pre-seeded identifiers for consistent colors across runs (order matters).
     # These common process types always get the same color.
