@@ -58,9 +58,11 @@ module Build
         end
         log_url = JSON.parse(log_url_res.body)["url"].to_s
 
+        colorizer = LogColorizer.new
+
         HTTP::Client.get(log_url) do |res|
           res.body_io.each_line do |line|
-            output.puts(line)
+            output.puts(colorizer.colorize(line))
           end
         end
 

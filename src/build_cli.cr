@@ -1,5 +1,6 @@
 require "athena-console"
 require "./utils"
+require "./log_colorizer"
 require "./commands/base"
 require "./commands/**"
 require "uri"
