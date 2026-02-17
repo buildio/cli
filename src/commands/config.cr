@@ -235,7 +235,7 @@ module Build
             end
             
             if env_id && !env_id.blank?
-              # Use environment endpoint - PATCH with the updates
+              # PATCH has merge semantics: send only the delta.
               api.api_v1_environments_id_patch(env_id, updates)
               if !show_json
                 output.puts "Setting config vars for environment... done".colorize(:green).to_s
@@ -244,13 +244,11 @@ module Build
                 end
               end
             else
-              # Get existing config vars and merge
+              # PATCH has merge semantics (matching Heroku's API): only keys in the
+              # payload are touched, absent keys are left unchanged. Send only the
+              # delta — sending the full set would trigger a deploy per key.
               if app_name_or_id
-                config_vars = api.config_vars(app_name_or_id)
-                updates.each do |k, v|
-                  config_vars[k] = v
-                end
-                api.set_config_vars(app_name_or_id, config_vars)
+                api.set_config_vars(app_name_or_id, updates)
                 if !show_json
                   output.puts "Setting config vars for #{app_name_or_id}... done".colorize(:green).to_s
                   updates.each do |key, value|
