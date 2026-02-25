@@ -135,8 +135,9 @@ module Build
 
           command_parts = input.argument("CMD", type: Array(String))
 
-          if command_parts.empty? && STDIN.tty?
-            return self.interactive_exec(app_name_or_id, dyno_name, output)
+          if STDIN.tty?
+            cmd = command_parts.empty? ? "bash" : command_parts.join(" ")
+            return self.interactive_exec(app_name_or_id, dyno_name, cmd, output)
           end
 
           if command_parts.empty?
@@ -177,7 +178,7 @@ module Build
           ACON::Command::Status::SUCCESS
         end
 
-        private def interactive_exec(app_id : String, dyno : String, output : ACON::Output::Interface) : ACON::Command::Status
+        private def interactive_exec(app_id : String, dyno : String, command : String, output : ACON::Output::Interface) : ACON::Command::Status
           user_token = self.token
           unless user_token
             output.puts("<error>   Not logged in</error>")
@@ -190,7 +191,7 @@ module Build
           scheme = Build.api_host_scheme == "https" ? "wss" : "ws"
           uri = URI.parse("#{scheme}://#{host}/cable?token=#{user_token}")
 
-          identifier = {channel: "ExecChannel", app: app_id, dyno: dyno, command: "bash"}.to_json
+          identifier = {channel: "ExecChannel", app: app_id, dyno: dyno, command: command}.to_json
 
           ws = HTTP::WebSocket.new(uri)
           ready = Channel(Bool).new(1)
