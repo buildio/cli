@@ -274,11 +274,13 @@ module Build
           terminal = ACON::Terminal.new
           self.send_cable(ws, identifier, {type: "resize", cols: terminal.width, rows: terminal.height})
 
-          # Handle terminal resize
-          Signal::WINCH.trap do
-            t = ACON::Terminal.new
-            self.send_cable(ws, identifier, {type: "resize", cols: t.width, rows: t.height}) rescue nil
-          end
+          # Handle terminal resize (SIGWINCH is Unix-only)
+          {% unless flag?(:win32) %}
+            Signal::WINCH.trap do
+              t = ACON::Terminal.new
+              self.send_cable(ws, identifier, {type: "resize", cols: t.width, rows: t.height}) rescue nil
+            end
+          {% end %}
 
           # Enter raw mode and stream stdin
           STDIN.noecho do
