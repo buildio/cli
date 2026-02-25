@@ -1,4 +1,6 @@
 require "term-spinner"
+require "http/web_socket"
+require "base64"
 
 module Build
   module Commands
@@ -18,7 +20,7 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name_or_id = input.option("app", type: String)
           json_output = input.option("json", type: Bool?) || false
-          
+
           if app_name_or_id.blank?
             output.puts("<error>   Missing required option --app</error>")
             return ACON::Command::Status::FAILURE
@@ -111,14 +113,20 @@ module Build
             .description("Execute a command in a running dyno")
             .option("app", "a", :required, "The ID or NAME of the application")
             .option("dyno", "d", :required, "The NAME of the dyno (e.g. web.1) to exec into")
-            .argument("CMD", ACON::Input::Argument::Mode[:required, :is_array], "Command to run inside the dyno")
-            .help("Execute a command in a running dyno")
+            .option("status", "s", :none, "Show exec readiness for all dynos")
+            .argument("CMD", ACON::Input::Argument::Mode[:optional, :is_array], "Command to run inside the dyno")
+            .help("Execute a command in a running dyno.\n\nWith no CMD, opens an interactive bash session.\nWith CMD, executes the command and returns output.\nWith --status, shows exec readiness per dyno.")
             .usage("ps:exec -a <app> -d <dyno> -- ls -l")
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name_or_id = input.option("app", type: String)
-          dyno_name      = input.option("dyno", type: String)
+
+          if input.option("status", type: Bool?)
+            return self.exec_status(app_name_or_id, output)
+          end
+
+          dyno_name = input.option("dyno", type: String)
 
           if app_name_or_id.blank? || dyno_name.blank?
             output.puts("<error>   Missing required options --app and/or --dyno</error>")
@@ -126,14 +134,20 @@ module Build
           end
 
           command_parts = input.argument("CMD", type: Array(String))
+
+          if command_parts.empty? && STDIN.tty?
+            return self.interactive_exec(app_name_or_id, dyno_name, output)
+          end
+
           if command_parts.empty?
-            output.puts("<error>   Missing command to execute</error>")
+            output.puts("<error>   No command specified and stdin is not a TTY</error>")
             return ACON::Command::Status::FAILURE
           end
 
+          # Non-interactive: existing HTTP POST path
           spinner = dots_spinner("Executing '#{command_parts.join(" ")}' on #{dyno_name}")
           begin
-            response_body = exec_dyno(app_name_or_id, dyno_name, command_parts)
+            response_body = self.exec_dyno(app_name_or_id, dyno_name, command_parts)
             spinner.success
             output.puts response_body
             ACON::Command::Status::SUCCESS
@@ -142,6 +156,155 @@ module Build
             output.puts("<error>   #{ex.message}</error>")
             ACON::Command::Status::FAILURE
           end
+        end
+
+        private def exec_status(app_id : String, output : ACON::Output::Interface) : ACON::Command::Status
+          if app_id.blank?
+            output.puts("<error>   Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
+          dynos = api.list_dynos(app_id)
+          unless dynos
+            output.puts("<info>   No processes found</info>")
+            return ACON::Command::Status::SUCCESS
+          end
+          dynos.each do |dyno|
+            dyno.processes.each do |process|
+              status = process.status == "Running" ? "ready".colorize.green : "not ready".colorize.red
+              output.puts "#{dyno._type}.#{process.index}: #{status}"
+            end
+          end
+          ACON::Command::Status::SUCCESS
+        end
+
+        private def interactive_exec(app_id : String, dyno : String, output : ACON::Output::Interface) : ACON::Command::Status
+          user_token = self.token
+          unless user_token
+            output.puts("<error>   Not logged in</error>")
+            return ACON::Command::Status::FAILURE
+          end
+
+          spinner = dots_spinner("Connecting to #{dyno}")
+
+          host = Build.api_host
+          scheme = Build.api_host_scheme == "https" ? "wss" : "ws"
+          uri = URI.parse("#{scheme}://#{host}/cable?token=#{user_token}")
+
+          identifier = {channel: "ExecChannel", app: app_id, dyno: dyno, command: "bash"}.to_json
+
+          ws = HTTP::WebSocket.new(uri)
+          ready = Channel(Bool).new(1)
+          done = Channel(Nil).new(1)
+
+          ws.on_message do |msg|
+            parsed = JSON.parse(msg)
+            type = parsed["type"]?.try(&.as_s)
+
+            case type
+            when "welcome"
+              ws.send({command: "subscribe", identifier: identifier}.to_json)
+            when "confirm_subscription"
+              # Waiting for server's "connected" message
+            when "ping"
+              # no-op
+            when "reject_subscription"
+              spinner.error
+              select
+              when ready.send(false)
+              else
+              end
+            when "disconnect"
+              select
+              when done.send(nil)
+              else
+              end
+            else
+              if message = parsed["message"]?
+                case message["type"]?.try(&.as_s)
+                when "connected"
+                  select
+                  when ready.send(true)
+                  else
+                  end
+                when "stdout"
+                  if data = message["data"]?.try(&.as_s)
+                    STDOUT.write(Base64.decode(data))
+                    STDOUT.flush
+                  end
+                when "error"
+                  STDERR.puts("\r\n#{message["message"]?.try(&.as_s) || "Unknown error"}")
+                  select
+                  when done.send(nil)
+                  else
+                  end
+                when "exit"
+                  select
+                  when done.send(nil)
+                  else
+                  end
+                end
+              end
+            end
+          end
+
+          ws.on_close do |code, reason|
+            select
+            when ready.send(false)
+            else
+            end
+            select
+            when done.send(nil)
+            else
+            end
+          end
+
+          # Run WebSocket in background fiber
+          spawn do
+            ws.run
+          rescue
+          end
+
+          # Wait for connection
+          unless ready.receive
+            return ACON::Command::Status::FAILURE
+          end
+          spinner.success
+
+          # Send initial terminal size
+          terminal = ACON::Terminal.new
+          self.send_cable(ws, identifier, {type: "resize", cols: terminal.width, rows: terminal.height})
+
+          # Handle terminal resize
+          Signal::WINCH.trap do
+            t = ACON::Terminal.new
+            self.send_cable(ws, identifier, {type: "resize", cols: t.width, rows: t.height}) rescue nil
+          end
+
+          # Enter raw mode and stream stdin
+          STDIN.noecho do
+            STDIN.raw do
+              spawn do
+                buf = Bytes.new(4096)
+                loop do
+                  count = STDIN.read(buf)
+                  break if count == 0
+                  data = Base64.strict_encode(buf[0, count])
+                  self.send_cable(ws, identifier, {type: "stdin", data: data})
+                rescue
+                  break
+                end
+              end
+
+              done.receive
+            end
+          end
+
+          ws.close rescue nil
+          ACON::Command::Status::SUCCESS
+        end
+
+        private def send_cable(ws : HTTP::WebSocket, identifier : String, data : NamedTuple)
+          ws.send({command: "message", identifier: identifier, data: data.to_json}.to_json)
         end
 
         private def exec_dyno(app_id : String, dyno : String, command_parts : Array(String)) : String
