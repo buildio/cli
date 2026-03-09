@@ -67,6 +67,8 @@ application.add Build::Commands::Logs.new
 application.add Build::Commands::App::Create.new
 application.add Build::Commands::App::List.new
 application.add Build::Commands::App::Info.new
+application.add Build::Commands::App::Stacks.new
+application.add Build::Commands::App::StacksSet.new
 application.add Build::Commands::Team::List.new
 application.add Build::Commands::Team::Info.new
 application.add Build::Commands::Namespace::List.new
