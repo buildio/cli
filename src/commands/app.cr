@@ -101,6 +101,71 @@ module Build
           return ACON::Command::Status::SUCCESS
         end
       end
+      @[ACONA::AsCommand("apps:stacks")]
+      class Stacks < Base
+        protected def configure : Nil
+          self
+            .name("apps:stacks")
+            .description("Show the stack for an app.")
+            .argument("app", :optional, "The ID or NAME of the app.")
+            .option("app", "a", :optional, "The app.")
+            .help(<<-HELP
+            Show the current stack for an application. The stack determines the
+            base operating system image used for builds and dynos.
+
+            Example:
+              $ bld apps:stacks -a my-app
+              Stack: heroku-24
+            HELP
+            )
+            .aliases(["stack"])
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_input = input.argument("app", type: String | Nil) || input.option("app", type: String | Nil)
+          if app_input.nil?
+            output.puts "You must specify an app ID or NAME."
+            return ACON::Command::Status::FAILURE
+          end
+          app = api.app(app_input)
+          output.puts "#{app.stack}"
+          return ACON::Command::Status::SUCCESS
+        end
+      end
+
+      @[ACONA::AsCommand("apps:stacks:set")]
+      class StacksSet < Base
+        protected def configure : Nil
+          self
+            .name("apps:stacks:set")
+            .description("Set the stack for an app.")
+            .argument("stack", :required, "The stack to set (e.g. heroku-22, heroku-24).")
+            .option("app", "a", :optional, "The app.")
+            .help(<<-HELP
+            Set the build stack for an application. This determines the base
+            operating system image used for the next build. The change takes
+            effect on the next deployment.
+
+            Common stacks: heroku-20, heroku-22, heroku-24
+
+            Example:
+              $ bld apps:stacks:set heroku-24 -a my-app
+              Stack set to heroku-24 for my-app.
+            HELP
+            )
+        end
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_input = input.option("app", type: String | Nil)
+          if app_input.nil?
+            output.puts "You must specify an app with -a or --app."
+            return ACON::Command::Status::FAILURE
+          end
+          stack = input.argument("stack", type: String)
+          req = UpdateAppRequest.new(build_stack: stack)
+          app = api.update_app(app_input, req)
+          output.puts "Stack set to #{app.stack} for #{app.name}."
+          return ACON::Command::Status::SUCCESS
+        end
+      end
     end
   end
 end
