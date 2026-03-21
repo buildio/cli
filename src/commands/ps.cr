@@ -105,6 +105,128 @@ module Build
           return ACON::Command::Status::SUCCESS
         end
       end
+      @[ACONA::AsCommand("ps:scale")]
+      class Scale < Base
+        protected def configure : Nil
+          self
+            .name("ps:scale")
+            .description("Scale process formation")
+            .option("app", "a", :required, "The ID or NAME of the application")
+            .option("json", "j", :none, "Output in JSON format")
+            .argument("args", ACON::Input::Argument::Mode[:optional, :is_array], "TYPE=QUANTITY[:SIZE] pairs (e.g. web=2:Standard-2X worker=1)")
+            .help("Scale process types. With no arguments, shows current formation.\n\nExamples:\n  ps:scale -a myapp web=2\n  ps:scale -a myapp web=2:Standard-2X worker=1")
+        end
+
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          app_name_or_id = input.option("app", type: String)
+          json_output = input.option("json", type: Bool?) || false
+          scale_args = input.argument("args", type: Array(String))
+
+          if app_name_or_id.blank?
+            output.puts("<error>Missing required option --app</error>")
+            return ACON::Command::Status::FAILURE
+          end
+
+          if scale_args.empty?
+            return show_formation(app_name_or_id, json_output, output)
+          end
+
+          updates = Array(Hash(String, String | Int32)).new
+          scale_args.each do |arg|
+            type_part, _, rest = arg.partition('=')
+            if rest.empty?
+              output.puts("<error>Invalid argument '#{arg}'. Use TYPE=QUANTITY[:SIZE]</error>")
+              return ACON::Command::Status::FAILURE
+            end
+            qty_part, _, size_part = rest.partition(':')
+            qty = qty_part.to_i?
+            unless qty
+              output.puts("<error>Invalid quantity '#{qty_part}' in '#{arg}'</error>")
+              return ACON::Command::Status::FAILURE
+            end
+            update = Hash(String, String | Int32).new
+            update["type"] = type_part
+            update["quantity"] = qty
+            update["size"] = size_part unless size_part.empty?
+            updates << update
+          end
+
+          begin
+            api
+            data = scale_formation(app_name_or_id, updates)
+            if json_output
+              output.puts data
+            else
+              parsed = JSON.parse(data)
+              entries = parsed.as_a? || parsed.as_h.values.find(&.as_a?).try(&.as_a) || [parsed]
+              entries.each do |entry|
+                type = entry["type"]?.try(&.as_s?) || next
+                qty = entry["quantity"]?.try(&.as_i?) || next
+                size = entry["size"]?.try(&.as_s?) || ""
+                label = size.empty? ? "#{type}=#{qty}" : "#{type}=#{qty}:#{size}"
+                output.puts "Scaling #{label}... done"
+              end
+            end
+            return ACON::Command::Status::SUCCESS
+          rescue e : Build::ApiError
+            output.puts "<error>Failed to scale: #{e.message}</error>"
+            return ACON::Command::Status::FAILURE
+          end
+        end
+
+        private def show_formation(app_id : String, json_output : Bool, output : ACON::Output::Interface) : ACON::Command::Status
+          begin
+            api
+            data = fetch_formation(app_id)
+            if json_output
+              output.puts data
+            else
+              parsed = JSON.parse(data)
+              entries = parsed.as_a? || parsed.as_h.values.find(&.as_a?).try(&.as_a) || [parsed]
+              entries.each do |entry|
+                type = entry["type"]?.try(&.as_s?) || next
+                qty = entry["quantity"]?.try(&.as_i?) || next
+                size = entry["size"]?.try(&.as_s?) || ""
+                label = size.empty? ? "#{type}=#{qty}" : "#{type}=#{qty}:#{size}"
+                output.puts label
+              end
+            end
+            return ACON::Command::Status::SUCCESS
+          rescue e : Build::ApiError
+            output.puts "<error>Failed to get formation: #{e.message}</error>"
+            return ACON::Command::Status::FAILURE
+          end
+        end
+
+        private def fetch_formation(app_id : String) : String
+          path = "/api/v1/apps/#{URI.encode_path(app_id)}/formation"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          data, _status, _headers = api_client.call_api(:GET, path,
+            :"FormationApi.list", "String", nil, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          data
+        end
+
+        private def scale_formation(app_id : String, updates : Array(Hash(String, String | Int32))) : String
+          path = "/api/v1/apps/#{URI.encode_path(app_id)}/formation"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          header_params["Content-Type"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          body = {"updates" => updates}.to_json
+          data, _status, _headers = api_client.call_api(:PATCH, path,
+            :"FormationApi.batch_update", "String", body, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          data
+        end
+      end
+
       @[ACONA::AsCommand("ps:exec")]
       class Exec < Base
         protected def configure : Nil
