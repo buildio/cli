@@ -83,6 +83,7 @@ application.add Build::Commands::Config::Delete.new
 
 application.add Build::Commands::Process::List.new
 application.add Build::Commands::Process::Delete.new
+application.add Build::Commands::Process::Scale.new
 application.add Build::Commands::Process::Exec.new
 
 application.add Build::Commands::Pipeline::List.new
@@ -90,6 +91,8 @@ application.add Build::Commands::Pipeline::Info.new
 
 # Addon management commands
 application.add Build::Commands::Addons::List.new
+application.add Build::Commands::Addons::Services.new
+application.add Build::Commands::Addons::Plans.new
 application.add Build::Commands::Addons::Create.new
 application.add Build::Commands::Addons::Info.new
 application.add Build::Commands::Addons::Destroy.new
