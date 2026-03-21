@@ -69,6 +69,108 @@ module Build
         end
       end
 
+      @[ACONA::AsCommand("addons:services")]
+      class Services < Base
+        protected def configure : Nil
+          self
+            .name("addons:services")
+            .description("List available addon services.")
+            .option("json", "j", :none, "Output in JSON format.")
+            .help("List all available addon services from the catalog.")
+        end
+
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          json_output = input.option("json", type: Bool)
+
+          begin
+            api
+            data = self.fetch_services
+            if json_output
+              output.puts data
+            else
+              parsed = JSON.parse(data)
+              headers = {"slug", "name", "state"}
+              rows = parsed.as_a.map do |svc|
+                {svc["name"].as_s, svc["human_name"]?.try(&.as_s?) || svc["name"].as_s, svc["state"]?.try(&.as_s?) || ""}
+              end
+              print_table(output, headers, rows)
+            end
+            return ACON::Command::Status::SUCCESS
+          rescue e : Build::ApiError
+            output.puts "<error>Failed to list addon services: #{e.message}</error>"
+            return ACON::Command::Status::FAILURE
+          end
+        end
+
+        private def fetch_services : String
+          path = "/api/v1/addon-services"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          data, _status, _headers = api_client.call_api(:GET, path,
+            :"AddonServicesApi.index", "String", nil, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          data
+        end
+      end
+
+      @[ACONA::AsCommand("addons:plans")]
+      class Plans < Base
+        protected def configure : Nil
+          self
+            .name("addons:plans")
+            .description("List plans for an addon service.")
+            .argument("service", :required, "Addon service name (e.g. bld-postgres).")
+            .option("json", "j", :none, "Output in JSON format.")
+            .help("List available plans for an addon service.")
+        end
+
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          service_name = input.argument("service", type: String)
+          json_output = input.option("json", type: Bool)
+
+          begin
+            api
+            data = self.fetch_plans(service_name)
+            if json_output
+              output.puts data
+            else
+              parsed = JSON.parse(data)
+              headers = {"default", "slug", "name", "price"}
+              rows = parsed.as_a.map do |plan|
+                is_default = plan["default"]?.try(&.as_bool?) ? "default" : ""
+                slug = "#{service_name}:#{plan["name"].as_s}"
+                human = plan["human_name"]?.try(&.as_s?) || plan["name"].as_s
+                cents = plan["monthly_price"]?.try(&.["cents"]?.try(&.as_i?))
+                unit = plan["monthly_price"]?.try(&.["unit"]?.try(&.as_s?))
+                price = (cents && unit) ? "$#{"%.2f" % (cents / 100.0)}/#{unit}" : ""
+                {is_default, slug, human, price}
+              end
+              print_table(output, headers, rows)
+            end
+            return ACON::Command::Status::SUCCESS
+          rescue e : Build::ApiError
+            output.puts "<error>Failed to list plans: #{e.message}</error>"
+            return ACON::Command::Status::FAILURE
+          end
+        end
+
+        private def fetch_plans(service_name : String) : String
+          path = "/api/v1/addon-services/#{URI.encode_path(service_name)}/plans"
+          api_client = Build::ApiClient.default
+          header_params = Hash(String, String).new
+          header_params["Accept"] = "application/json"
+          auth_names = ["bearer", "oauth2"]
+          data, _status, _headers = api_client.call_api(:GET, path,
+            :"AddonServicesApi.plans", "String", nil, auth_names,
+            header_params, Hash(String, String).new, Hash(String, String).new,
+            Hash(Symbol, (String | ::File)).new)
+          data
+        end
+      end
+
       @[ACONA::AsCommand("addons:create")]
       class Create < Base
         protected def configure : Nil
@@ -122,7 +224,26 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to create addon: #{e.message}</error>"
+            # Try to parse structured error response for actionable suggestions
+            if body = e.message
+              begin
+                parsed = JSON.parse(body)
+                msg = parsed["message"]?.try(&.as_s?) || body
+                output.puts "<error>#{msg}</error>"
+                if plans = parsed["available_plans"]?
+                  plan_list = plans.as_a.map(&.as_s).join(", ")
+                  output.puts "Available plans: #{plan_list}"
+                  service_name = plan.split(":").first?
+                  output.puts "Run 'bld addons:plans #{service_name}' to see plan details." if service_name
+                elsif hint = parsed["hint"]?.try(&.as_s?)
+                  output.puts "Run 'bld addons:services' to see available services."
+                end
+              rescue JSON::ParseException
+                output.puts "<error>Failed to create addon: #{e.message}</error>"
+              end
+            else
+              output.puts "<error>Failed to create addon</error>"
+            end
             return ACON::Command::Status::FAILURE
           end
         end
