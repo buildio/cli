@@ -30,6 +30,18 @@ module Build
         # Configure the API client
         @api_instance = Build::DefaultApi.new
       end
+
+      def print_table(output : ACON::Output::Interface, headers : Tuple, rows : Array(Tuple))
+        widths = Array(Int32).new(headers.size, 0)
+        headers.each_with_index { |h, i| widths[i] = {widths[i], h.size}.max }
+        rows.each do |row|
+          row.each_with_index { |val, i| widths[i] = {widths[i], val.size}.max if i < widths.size }
+        end
+        fmt = widths.map_with_index { |w, i| i == widths.size - 1 ? "%s" : "%-#{w}s" }.join("  ")
+        output.puts fmt % headers
+        output.puts widths.map { |w| "─" * w }.join("  ")
+        rows.each { |row| output.puts fmt % row }
+      end
     end
   end
 end
