@@ -88,6 +88,7 @@ application.add Build::Commands::Process::Exec.new
 
 application.add Build::Commands::Pipeline::List.new
 application.add Build::Commands::Pipeline::Info.new
+application.add Build::Commands::Pipeline::Diff.new
 application.add Build::Commands::Pipeline::Promote.new
 
 # Addon management commands
