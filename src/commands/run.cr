@@ -24,9 +24,11 @@ module Build
           .option("debug", nil, :none, "Show verbose debugging information")
           .option("no-tty", nil, :none, "Force the command to not run in a tty")
           .option("exit-code", "x", :none, "Passthrough the exit code of the remote command")
+          .option("file", "f", :optional, "Send a local file as stdin to the remote command")
           .description("Run a command in a once-off dyno on the Build platform")
-          .help("This command is used to run a once-off dyno on the Build platform. It is useful for running tasks that are not part of a web process type such as database migrations, console sessions, or one-off scripts. The run command takes a command to run as an argument. The command will be executed in a one-off dyno on the Build platform.")
+          .help("This command is used to run a once-off dyno on the Build platform. It is useful for running tasks that are not part of a web process type such as database migrations, console sessions, or one-off scripts. The run command takes a command to run as an argument. The command will be executed in a one-off dyno on the Build platform.\n\nUse --file to pipe a local file as stdin to the remote command, avoiding shell escaping issues:\n  bld run rails runner -a my-app --file script.rb\n  bld run ruby -a my-app --file migrate.rb\n\nYou can also pipe via stdin directly:\n  bld run rails runner -a my-app < script.rb")
           .usage("bash -a my-app")
+          .usage("rails runner -a my-app --file script.rb")
           #.aliases(["exec", "shell", "console"])
       end
 
@@ -50,11 +52,19 @@ module Build
         no_tty = input.option("no-tty", type: Bool)
         exit_code_mode = input.option("exit-code", type: Bool)
         command_array = input.argument("cmd", type: Array(String)) rescue [] of String
+        file_path = input.option("file", type: String?)
+
+        # Validate --file if specified
+        if file_path && !File.exists?(file_path)
+          output.puts "File not found: #{file_path}"
+          return ACON::Command::Status::FAILURE
+        end
 
         # Determine if we should use a TTY
         # Use TTY for interactive shells, or when explicitly requested (not --no-tty)
         # and when stdin/stdout are actually TTYs
-        use_tty = !no_tty && STDIN.tty? && STDOUT.tty?
+        # --file implies non-TTY since we're piping file content as stdin
+        use_tty = !no_tty && !file_path && STDIN.tty? && STDOUT.tty?
 
         terminal = ACON::Terminal.new
         width = terminal.width
@@ -183,19 +193,27 @@ module Build
                 end
               end
             else
-              # Non-TTY mode: pipe stdin and read output without raw mode
+              # Non-TTY mode: pipe stdin (or --file) and read output without raw mode
               spawn do
+                input_io : IO = if fp = file_path
+                  File.open(fp)
+                else
+                  STDIN
+                end
                 buffer = Bytes.new(4096)
                 slice = buffer.to_slice
-                loop do
-                  count = STDIN.read(slice)
-                  if count > 0
-                    channel.write(slice[0, count])
-                  else
-                    # Send EOF to indicate stdin is closed
-                    channel.send_eof
-                    break
+                begin
+                  loop do
+                    count = input_io.read(slice)
+                    if count > 0
+                      channel.write(slice[0, count])
+                    else
+                      channel.send_eof
+                      break
+                    end
                   end
+                ensure
+                  input_io.close if file_path
                 end
               end
               remote_exit_code = read_channel_output(channel, output, verbose, exit_code_mode)
