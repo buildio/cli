@@ -20,7 +20,17 @@ module Build
             .option("team", "t", :optional, "Team.")
             # Allow --json to be passed in
             .option("json", "j", :none, "Output in JSON format.")
-            .help("Apps are Build.io native applications that you have access to.")
+            .help(<<-HELP
+            List apps you have access to. By default, only personal apps are shown.
+            To see apps owned by a team, use the -t flag. Use `bld teams` to see
+            your available teams and their apps.
+
+            Examples:
+              $ bld apps                  # personal apps only
+              $ bld apps -t my-team       # apps for a specific team
+              $ bld teams                 # list teams to find team apps
+            HELP
+            )
             .aliases(["apps"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -37,6 +47,11 @@ module Build
             output.puts ""
             apps.each do |app|
               output.puts "  #{app.name} (#{app.id})"
+            end
+            if !team_id
+              output.puts ""
+              output.puts "To see apps owned by a team, run: bld apps -t <team>"
+              output.puts "To list available teams, run: bld teams"
             end
           end
           return ACON::Command::Status::SUCCESS
