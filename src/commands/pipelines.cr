@@ -139,24 +139,18 @@ module Build
         protected def configure : Nil
           self
             .name("pipelines:diff")
-            .argument("apps", :is_array, "Source app (and optional target app)", [] of String)
             .option("app", "a", :required, "Source app to compare")
             .option("json", "j", :none, "Output in JSON format")
             .description("compares the latest release of this app to its downstream app(s)")
-            .help("Shows commit differences between a source app and its downstream pipeline targets.\n\nExamples:\n  bld pipelines:diff -a my-app-staging\n  bld pipelines:diff my-app-staging")
+            .help("Shows commit differences between a source app and its downstream pipeline targets.\n\nExamples:\n  bld pipelines:diff -a my-app-staging")
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api
           json_mode = input.option("json", type: Bool)
-          # Support both: -a app-name OR positional arg
           app_name = input.option("app", type: String?) rescue nil
           if app_name.nil? || app_name.empty?
-            args = input.argument("apps", type: Array(String)) rescue [] of String
-            app_name = args.first? || ""
-          end
-          if app_name.empty?
-            output.puts ">".colorize(:red).to_s + "   Error: specify an app with --app (-a) or as a positional argument"
+            output.puts ">".colorize(:red).to_s + "   Error: specify an app with --app (-a)"
             return ACON::Command::Status::FAILURE
           end
 
