@@ -134,6 +134,108 @@ module Build
         end
       end
 
+      @[ACONA::AsCommand("pipelines:diff")]
+      class Diff < Base
+        protected def configure : Nil
+          self
+            .name("pipelines:diff")
+            .option("app", "a", :required, "Source app to compare")
+            .option("json", "j", :none, "Output in JSON format")
+            .description("compares the latest release of this app to its downstream app(s)")
+            .help("Shows commit differences between a source app and its downstream pipeline targets.\n\nExamples:\n  bld pipelines:diff -a my-app-staging")
+        end
+
+        protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+          api
+          json_mode = input.option("json", type: Bool)
+          app_name = input.option("app", type: String)
+
+          spinner = dots_spinner("Fetching diff")
+          app = self.api.app(app_name)
+          pipeline = app.pipeline
+          unless pipeline && pipeline.id
+            spinner.error("App #{app_name} is not in a pipeline")
+            return ACON::Command::Status::FAILURE
+          end
+          pipeline_id = pipeline.id.not_nil!
+
+          pipelines_api = Build::PipelinesApi.new
+          diff_response = pipelines_api.get_pipeline_diff(pipeline_id, app_name)
+          spinner.success
+
+          if json_mode
+            output.puts diff_response.to_json
+            return ACON::Command::Status::SUCCESS
+          end
+
+          diffs = diff_response.diffs
+          source_name = diff_response.source.try(&.name) || app_name
+
+          if diffs.nil? || diffs.empty?
+            output.puts "No downstream apps to compare."
+            return ACON::Command::Status::SUCCESS
+          end
+
+          diffs.each do |d|
+            target_name = d.app.try(&.name) || "unknown"
+
+            if d.status == "error"
+              output.puts ""
+              output.puts "#{source_name.colorize.fore(104_u8)} was not compared to #{target_name.colorize.fore(104_u8)}: #{d.error_message}"
+              next
+            end
+
+            ahead = d.ahead_by || 0
+            behind = d.behind_by || 0
+            commits = d.commits
+
+            if ahead == 0 && behind == 0
+              output.puts ""
+              output.puts "⬢ #{source_name.colorize.fore(104_u8)} is up to date with ⬢ #{target_name.colorize.fore(104_u8)}"
+              next
+            end
+
+            # Header
+            output.puts ""
+            parts = [] of String
+            parts << "ahead by #{ahead} commit#{"s" if ahead != 1}" if ahead > 0
+            parts << "behind by #{behind} commit#{"s" if behind != 1}" if behind > 0
+            output.puts "=== ⬢ #{source_name.colorize.fore(104_u8)} is #{parts.join(", ")} vs ⬢ #{target_name.colorize.fore(104_u8)}"
+
+            # Commit table
+            if commits && !commits.empty?
+              rows = commits.map do |c|
+                {
+                  (c.sha || "")[0, 7],
+                  c.date || "",
+                  c.author || "",
+                  (c.message || "").split("\n").first,
+                }
+              end
+              output.puts ""
+              print_table(output, {"SHA", "Date", "Author", "Message"}, rows)
+            end
+          end
+
+          ACON::Command::Status::SUCCESS
+        rescue ex : Build::ApiError
+          output.puts ">".colorize(:red).to_s + "   Error: #{ex.message}"
+          ACON::Command::Status::FAILURE
+        rescue ex : Exception
+          error_msg = ex.message || ""
+          if error_msg.blank?
+            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
+            output.puts "      1. Is the server running?"
+            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
+            output.puts "      3. Is the API URL correct? Set BUILD_API_URL"
+            output.puts "      Debug: #{ex.class.name}"
+          else
+            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
+          end
+          ACON::Command::Status::FAILURE
+        end
+      end
+
       @[ACONA::AsCommand("pipelines:promote")]
       class Promote < Base
         protected def configure : Nil
