@@ -101,6 +101,13 @@ application.add Build::Commands::Addons::Destroy.new
 application.add Build::Commands::Addons::Attach.new
 application.add Build::Commands::Addons::Detach.new
 
+# Buildpack management commands
+application.add Build::Commands::Buildpacks::List.new
+application.add Build::Commands::Buildpacks::Add.new
+application.add Build::Commands::Buildpacks::Set.new
+application.add Build::Commands::Buildpacks::Remove.new
+application.add Build::Commands::Buildpacks::Clear.new
+
 # Domain management commands
 application.add Build::Commands::Domains::List.new
 application.add Build::Commands::Domains::Add.new
