@@ -31,6 +31,11 @@ module Build
         @api_instance = Build::DefaultApi.new
       end
 
+      def buildpacks_api : Build::BuildpacksApi
+        api # ensure access_token is configured
+        Build::BuildpacksApi.new
+      end
+
       def print_table(output : ACON::Output::Interface, headers : Tuple, rows : Array(Tuple))
         widths = Array(Int32).new(headers.size, 0)
         headers.each_with_index { |h, i| widths[i] = {widths[i], h.size}.max }
