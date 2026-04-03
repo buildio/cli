@@ -16,113 +16,231 @@ module Build
         Build.io is a Heroku-compatible PaaS. The bld CLI manages apps, config,
         deployments, addons, domains, buildpacks, pipelines, and more.
 
+        All examples use -j (JSON output) with jq for reliable, parseable results.
+        This is the recommended approach for scripting and AI agents.
+
+        ============================================================
+        COLD START: From Nothing to a Running App
+        ============================================================
+
+        # 1. Login (one-time — saves credentials to ~/.netrc for API and git)
+        bld login
+
+        # 2. Create the app
+        bld apps:create my-app -t my-team -j | jq -r '.name'
+
+        # 3. Set buildpacks (if needed)
+        bld buildpacks:add heroku/nodejs -a my-app
+        bld buildpacks:add heroku/ruby -a my-app
+
+        # 4. Set config vars
+        bld config:set RAILS_ENV=production SECRET_KEY_BASE=abc123 -a my-app
+
+        # 5. Get the git URL and add it as a remote
+        GIT_URL=$(bld apps:info -a my-app -j | jq -r '.git_url')
+        git remote add bld "$GIT_URL"
+
+        # 6. Deploy via git push
+        git push bld main
+
+        # 7. Scale processes
+        bld ps:scale web=2:Standard-1X worker=1 -a my-app
+
+        # 8. Verify it's running
+        bld ps -a my-app -j | jq '.[] | {type, state, command}'
+        WEB_URL=$(bld apps:info -a my-app -j | jq -r '.web_url')
+        curl -s "$WEB_URL" | head -20
+
+        ============================================================
+        COMMAND REFERENCE (all with jq examples)
+        ============================================================
+
         --- Authentication ---
 
-        bld login                         # Browser-based OAuth login (saves to ~/.netrc)
-        bld whoami                        # Show current logged-in user
-
-        --- Git Push Deployment ---
-
-        Deploy by pushing to an app's git URL. After `bld login`, credentials for
-        the git host are stored in ~/.netrc automatically.
-
-          1. Get the app's git URL:
-               bld apps:info -a my-app
-               # => Git URL: https://git.build.io/my-app.git
-
-          2. Add as a git remote:
-               git remote add bld https://git.build.io/my-app.git
-
-          3. Push to deploy:
-               git push bld main
+        bld login                              # Browser-based OAuth login
+        bld whoami                             # Show current user
 
         --- Apps ---
 
-        bld apps                          # List personal apps
-        bld apps -t TEAM                  # List apps for a team
-        bld teams                         # List available teams
-        bld apps:info -a APP              # Show app details (git URL, region, stack, web URL)
-        bld apps:info -a APP -j           # JSON output
-        bld apps:create NAME              # Create personal app
-        bld apps:create NAME -t TEAM      # Create app in a team
-        bld apps:stacks -a APP            # Show current stack
-        bld apps:stacks:set heroku-24 -a APP  # Set stack for next build
+        # List personal apps (names only)
+        bld apps -j | jq -r '.[].name'
+
+        # List apps for a team
+        bld apps -t my-team -j | jq -r '.[].name'
+
+        # Discover all apps: list teams first, then apps per team
+        bld teams -j | jq -r '.[].name'
+        bld apps -t TEAM -j | jq -r '.[].name'
+
+        # App details — extract specific fields
+        bld apps:info -a APP -j | jq '{name, git_url, web_url, region, stack}'
+
+        # Get the git push URL
+        bld apps:info -a APP -j | jq -r '.git_url'
+
+        # Get the web URL
+        bld apps:info -a APP -j | jq -r '.web_url'
+
+        # Create an app and capture its name
+        bld apps:create my-app -j | jq -r '.name'
+
+        # Create in a team
+        bld apps:create my-app -t my-team -j | jq -r '.name'
+
+        # Show/set stack
+        bld apps:stacks -a APP
+        bld apps:stacks:set heroku-24 -a APP
 
         --- Config Vars ---
 
-        bld config -a APP                 # List all config vars
-        bld config:get KEY -a APP         # Get a specific var
-        bld config:set KEY=VAL -a APP     # Set a config var
-        bld config:unset KEY -a APP       # Remove a config var
+        # List all config vars as key=value
+        bld config -a APP -j | jq -r 'to_entries[] | "\(.key)=\(.value)"'
+
+        # Get a single var
+        bld config:get DATABASE_URL -a APP -j | jq -r '.DATABASE_URL'
+
+        # Set vars (multiple at once)
+        bld config:set KEY1=val1 KEY2=val2 -a APP
+
+        # Unset a var
+        bld config:unset KEY -a APP
+
+        --- Git Push Deployment ---
+
+        # Full workflow to deploy an existing repo to an existing app:
+        GIT_URL=$(bld apps:info -a APP -j | jq -r '.git_url')
+        git remote add bld "$GIT_URL"    # one-time setup
+        git push bld main                # deploy
+
+        # Credentials are stored in ~/.netrc by `bld login` for both
+        # the API host and the git host, so git push works immediately.
 
         --- Processes (Dynos) ---
 
-        bld ps -a APP                     # List running processes
-        bld ps:scale web=2 -a APP         # Scale web to 2 dynos
-        bld ps:scale web=1:Standard-2X -a APP  # Scale with size
-        bld ps:restart -a APP             # Restart all processes
-        bld ps:exec COMMAND -a APP        # Run command in a running dyno
-        bld run COMMAND -a APP            # Run a one-off dyno
+        # List processes with state
+        bld ps -a APP -j | jq '.[] | {type, state, size, command}'
+
+        # Scale
+        bld ps:scale web=2 -a APP
+        bld ps:scale web=1:Standard-2X worker=3:Standard-1X -a APP
+
+        # Restart all
+        bld ps:restart -a APP
+
+        # Run a one-off command
+        bld run bash -a APP
+        bld run 'rails console' -a APP
+
+        # Exec into a running dyno
+        bld ps:exec 'ls -la /app' -a APP
 
         --- Buildpacks ---
 
-        bld buildpacks -a APP             # List buildpacks
-        bld buildpacks:add BP -a APP      # Append a buildpack
-        bld buildpacks:add BP -a APP -i 1 # Insert at position
-        bld buildpacks:set BP -a APP      # Replace first buildpack
-        bld buildpacks:remove BP -a APP   # Remove by name/URL
-        bld buildpacks:remove -i 2 -a APP # Remove by index
-        bld buildpacks:clear -a APP       # Clear all buildpacks
+        # List buildpack URLs
+        bld buildpacks -a APP -j | jq -r '.[].buildpack.url'
+
+        # Add (append)
+        bld buildpacks:add heroku/nodejs -a APP
+
+        # Insert at position 1
+        bld buildpacks:add heroku/ruby -a APP -i 1
+
+        # Replace first buildpack
+        bld buildpacks:set heroku/python -a APP
+
+        # Remove by name
+        bld buildpacks:remove heroku/nodejs -a APP
+
+        # Remove by index
+        bld buildpacks:remove -i 2 -a APP
+
+        # Clear all
+        bld buildpacks:clear -a APP
 
         --- Addons ---
 
-        bld addons -a APP                 # List addons for an app
-        bld addons:services               # List available addon services
-        bld addons:plans SERVICE          # List plans for a service
-        bld addons:create SERVICE:PLAN -a APP  # Provision an addon
-        bld addons:info ADDON             # Show addon details
-        bld addons:destroy ADDON          # Remove an addon
-        bld addons:attach ADDON -a APP    # Attach addon to another app
-        bld addons:detach ADDON -a APP    # Detach addon from an app
+        # List addons for an app
+        bld addons -a APP -j | jq '.[] | {name, plan: .plan.name, state}'
+
+        # Browse available services
+        bld addons:services -j | jq -r '.[].name'
+
+        # List plans for a service
+        bld addons:plans heroku-postgresql -j | jq '.[] | {name, price}'
+
+        # Provision
+        bld addons:create heroku-postgresql:essential-0 -a APP
+
+        # Destroy
+        bld addons:destroy postgresql-curved-12345
+
+        # Attach/detach across apps
+        bld addons:attach ADDON_NAME -a OTHER_APP
+        bld addons:detach ADDON_NAME -a OTHER_APP
 
         --- Domains ---
 
-        bld domains -a APP                # List custom domains
-        bld domains:add DOMAIN -a APP     # Add a domain
-        bld domains:remove DOMAIN -a APP  # Remove a domain
-        bld domains:clear -a APP          # Remove all custom domains
-        bld domains:info DOMAIN -a APP    # Show domain details
-        bld domains:wait DOMAIN -a APP    # Wait for DNS/TLS provisioning
+        # List domains
+        bld domains -a APP -j | jq -r '.[].hostname'
+
+        # Add a custom domain
+        bld domains:add www.example.com -a APP
+
+        # Check domain status (CNAME target)
+        bld domains:info www.example.com -a APP -j | jq '{hostname, status, cname}'
+
+        # Wait for provisioning
+        bld domains:wait www.example.com -a APP
+
+        # Remove
+        bld domains:remove www.example.com -a APP
+
+        # Clear all custom domains
+        bld domains:clear -a APP
 
         --- Pipelines ---
 
-        bld pipelines                     # List your pipelines
-        bld pipelines:info PIPELINE       # Show pipeline details
-        bld pipelines:diff -a APP         # Compare app to downstream
-        bld pipelines:promote -a APP      # Promote to downstream
+        # List pipelines
+        bld pipelines -j | jq -r '.[].name'
+
+        # Pipeline details (shows apps per stage)
+        bld pipelines:info PIPELINE -j | jq '.'
+
+        # Compare staging to production
+        bld pipelines:diff -a my-app-staging
+
+        # Promote staging to production
+        bld pipelines:promote -a my-app-staging
 
         --- Logs ---
 
-        bld logs -a APP                   # Stream application logs
-        bld logs -a APP -n 100            # Show last 100 lines
+        bld logs -a APP                        # Stream logs (follow)
+        bld logs -a APP -n 200                 # Last 200 lines
 
-        --- JSON Output ---
+        --- Teams ---
 
-        Most commands accept -j / --json for machine-readable output.
+        # List your teams
+        bld teams -j | jq -r '.[].name'
 
-          bld apps -j                     # JSON array of apps
-          bld apps:info -a APP -j         # JSON app object
-          bld config -a APP -j            # JSON config vars
-          bld buildpacks -a APP -j        # JSON buildpack array
+        # Team details
+        bld teams:info TEAM -j | jq '.'
 
-        --- Tips for AI Agents ---
+        ============================================================
+        TIPS FOR AI AGENTS
+        ============================================================
 
-        - Always use -a APP to specify the target app.
-        - Use -j for structured output you can parse.
-        - Use `bld teams` first to discover team apps (`bld apps -t TEAM`).
-        - Deploy via git push: get the URL from `bld apps:info -a APP`.
-        - All mutations (config:set, buildpacks:add, etc.) take effect immediately
-          or on next deploy, depending on the resource.
+        1. ALWAYS use -j (JSON) and parse with jq. Never regex text output.
+        2. Use -a APP on every command that targets an app.
+        3. Discover apps: `bld teams -j` then `bld apps -t TEAM -j` per team.
+        4. Deploy via git push — get the URL with:
+             bld apps:info -a APP -j | jq -r '.git_url'
+        5. Chain creation + deploy:
+             NAME=$(bld apps:create foo -t team -j | jq -r '.name')
+             GIT_URL=$(bld apps:info -a "$NAME" -j | jq -r '.git_url')
+             git remote add bld "$GIT_URL" && git push bld main
+        6. Config changes take effect on next deploy or dyno restart.
+        7. Buildpack changes take effect on next deploy.
+        8. Scale changes take effect immediately.
         SKILLS
         ACON::Command::Status::SUCCESS
       end
