@@ -69,6 +69,7 @@ module Build
 
         user_netrc = Netrc.read
         user_netrc[Build.api_host]  = {"#{user_email}", "#{user_token}"}
+        user_netrc[Build.git_host]  = {"#{user_email}", "#{user_token}"}
         user_netrc.save
         spinner.success
         output.puts "Logged in as #{user_email.colorize(:green)}"
