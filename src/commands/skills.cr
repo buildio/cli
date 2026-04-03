@@ -13,8 +13,19 @@ module Build
         output.puts <<-SKILLS
         === Build.io CLI (bld) — Skills Reference
 
-        Build.io is a Heroku-compatible PaaS. The bld CLI manages apps, config,
-        deployments, addons, domains, buildpacks, pipelines, and more.
+        Build.io is a Heroku-compatible PaaS following 12-Factor App principles.
+        Apps are configured entirely through environment variables (config vars),
+        declare process types in a Procfile, and use buildpacks to compile code.
+
+        Key concepts:
+        - Config: all settings via ENV vars (DATABASE_URL, SECRET_KEY_BASE, etc.)
+        - Procfile: declares process types (web, worker, etc.) and their commands
+        - Buildpacks: auto-detected for common languages (Ruby, Node, Python, Go,
+          Java, etc.) or set explicitly for custom stacks
+        - Domains: each app gets a default URL; add custom domains with TLS
+        - Apps: start here for quick deployment of a single service
+        - Pipelines: graduate to pipelines (staging → production) for mature apps
+          with review apps, promotion, and diff support
 
         All examples use -j (JSON output) with jq for reliable, parseable results.
         This is the recommended approach for scripting and AI agents.
@@ -22,6 +33,12 @@ module Build
         ============================================================
         COLD START: From Nothing to a Running App
         ============================================================
+
+        Your repo needs at minimum:
+        - A Procfile (e.g. `web: bundle exec puma -C config/puma.rb`)
+          or a language-standard entrypoint the buildpack can detect
+        - Buildpacks are auto-detected for most languages. Set them
+          explicitly only if auto-detection fails or you need multiple.
 
         # 1. Login (one-time — saves credentials to ~/.netrc for API and git)
         bld login
@@ -180,25 +197,24 @@ module Build
 
         --- Domains ---
 
+        Every app gets a default *.onbld.com URL. Add custom domains for production:
+
         # List domains
         bld domains -a APP -j | jq -r '.[].hostname'
 
         # Add a custom domain
         bld domains:add www.example.com -a APP
 
-        # Check domain status (CNAME target)
-        bld domains:info www.example.com -a APP -j | jq '{hostname, status, cname}'
+        # Point your DNS CNAME to the target shown by:
+        bld domains:info www.example.com -a APP -j | jq -r '.cname'
 
-        # Wait for provisioning
+        # TLS is provisioned automatically. Wait for it:
         bld domains:wait www.example.com -a APP
 
-        # Remove
-        bld domains:remove www.example.com -a APP
+        --- Pipelines (for mature apps) ---
 
-        # Clear all custom domains
-        bld domains:clear -a APP
-
-        --- Pipelines ---
+        Start with a single app for quick iteration. When ready for a
+        staging → production workflow, create a pipeline:
 
         # List pipelines
         bld pipelines -j | jq -r '.[].name'
@@ -206,10 +222,10 @@ module Build
         # Pipeline details (shows apps per stage)
         bld pipelines:info PIPELINE -j | jq '.'
 
-        # Compare staging to production
+        # Compare staging to production (shows commit diff)
         bld pipelines:diff -a my-app-staging
 
-        # Promote staging to production
+        # Promote staging to production (zero-downtime)
         bld pipelines:promote -a my-app-staging
 
         --- Logs ---
