@@ -78,10 +78,11 @@ module Build
           if input.option("json", type: Bool)
             output.puts app.to_json
           else
-            output.puts "App details:"
-            output.puts ""
-            output.puts "  Name: #{app.name}"
-            output.puts "  ID:   #{app.id}"
+            output.puts "=== #{app.name}"
+            output.puts "Git URL:    #{app.git_url}" if app.git_url
+            output.puts "Region:     #{app.region}"
+            output.puts "Stack:      #{app.stack || app.build_stack}"
+            output.puts "Web URL:    #{app.web_url}" if app.web_url
           end
           return ACON::Command::Status::SUCCESS
         end

@@ -29,6 +29,12 @@ module Build
     uri.host.not_nil! + (uri.port ? ":#{uri.port}" : "")
   end
 
+  def self.git_host
+    host = self.parsed_api_uri.host.not_nil!
+    parts = host.split(".", 2)
+    parts.size == 2 ? "git.#{parts[1]}" : "git.#{host}"
+  end
+
   def self.api_host_scheme
     self.parsed_api_uri.scheme.not_nil!
   end
@@ -64,6 +70,7 @@ application.add Build::Commands::OidcLogin.new
 application.add Build::Commands::Run.new
 {% end %}
 application.add Build::Commands::Logs.new
+application.add Build::Commands::Skills.new
 application.add Build::Commands::App::Create.new
 application.add Build::Commands::App::List.new
 application.add Build::Commands::App::Info.new
