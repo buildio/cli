@@ -179,17 +179,31 @@ module Build
         # List addons for an app
         bld addons -a APP -j | jq '.[] | {name, plan: .plan.name, state}'
 
-        # Browse available services
-        bld addons:services -j | jq -r '.[].name'
+        # Browse available services — IMPORTANT: use -j to see the summary
+        # field, which describes what the service actually is (e.g. "PostgreSQL
+        # as a Service"). The slug name alone is often not descriptive enough.
+        bld addons:services -j | jq '.[] | {name, summary, state}'
 
-        # List plans for a service
-        bld addons:plans heroku-postgresql -j | jq '.[] | {name, price}'
+        # Find a specific type of service (e.g. postgres)
+        bld addons:services -j | jq '.[] | select(.summary | test("postgres"; "i")) | {name, summary}'
 
-        # Provision
-        bld addons:create heroku-postgresql:essential-0 -a APP
+        # List plans and pricing for a service
+        bld addons:plans SERVICE -j | jq '.[] | {name, price}'
+
+        # Provision an addon
+        bld addons:create SERVICE:PLAN -a APP
+
+        # Example: provision a PostgreSQL database
+        # 1. Find the postgres service:
+        #    bld addons:services -j | jq '.[] | select(.summary | test("postgres"; "i")) | .name'
+        #    => "schema-to-go"
+        # 2. List plans:
+        #    bld addons:plans schema-to-go -j | jq '.[] | {name, price}'
+        # 3. Provision:
+        #    bld addons:create schema-to-go:mini -a APP
 
         # Destroy
-        bld addons:destroy postgresql-curved-12345
+        bld addons:destroy ADDON_NAME
 
         # Attach/detach across apps
         bld addons:attach ADDON_NAME -a OTHER_APP

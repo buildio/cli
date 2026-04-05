@@ -89,9 +89,9 @@ module Build
               output.puts data
             else
               parsed = JSON.parse(data)
-              headers = {"slug", "name", "state"}
+              headers = {"slug", "name", "summary", "state"}
               rows = parsed.as_a.map do |svc|
-                {svc["name"].as_s, svc["human_name"]?.try(&.as_s?) || svc["name"].as_s, svc["state"]?.try(&.as_s?) || ""}
+                {svc["name"].as_s, svc["human_name"]?.try(&.as_s?) || svc["name"].as_s, svc["summary"]?.try(&.as_s?) || "", svc["state"]?.try(&.as_s?) || ""}
               end
               print_table(output, headers, rows)
             end
