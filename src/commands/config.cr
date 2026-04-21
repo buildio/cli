@@ -193,6 +193,7 @@ module Build
             .argument("KEY=VALUE", ACON::Input::Argument::Mode[:optional, :is_array], "The name and value of the config variable(s) to set. Omit to read from STDIN.")
             .option("app", "a", :optional, "The name of the application.")
             .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
+            .option("chunk-size", nil, :optional, "Max vars per API call when setting many at once (default: 20).")
             .option("json", "j", :none, "Output in JSON format.")
             .help(<<-HELP
             Set config variables for an app or environment.
@@ -201,12 +202,36 @@ module Build
             the shell format emitted by `bld config -s` (KEY=value or KEY='value').
             Blank lines, `#` comments, and an optional `export` prefix are ignored.
 
+            Large batches are sent in chunks (default 20 vars per call) to avoid
+            upstream request timeouts. Tune with --chunk-size.
+
             Examples:
               bld config:set KEY1=val1 KEY2=val2 -a my-app
               bld config -a src-app -s | bld config:set -a dst-app
               bld config -a src-app -s > env.out && bld config:set -a dst-app < env.out
+              bld config:set -a my-app --chunk-size 10 < big.env
             HELP
             )
+        end
+
+        # Translate an exception into a short, user-facing string. Upstream
+        # gateways (load balancers, proxies) often return HTML error pages
+        # on timeout or backend crash — surface a terse message instead of
+        # dumping markup at the user.
+        private def friendly_error(ex : Exception) : String
+          body = (ex.message || "").strip
+          code = ex.is_a?(Build::ApiError) ? ex.code : nil
+          looks_html = body.starts_with?("<") ||
+                       body.includes?("<!DOCTYPE") ||
+                       body.includes?("<html")
+          if looks_html
+            status = code ? " (HTTP #{code})" : ""
+            "upstream gateway returned an error page#{status}. The backend likely timed out or errored mid-request. For large config:set batches, try a smaller --chunk-size."
+          elsif code
+            "HTTP #{code}: #{body}"
+          else
+            body.empty? ? ex.class.name : body
+          end
         end
 
         # Parse shell-style env lines from STDIN. Matches the output of
@@ -282,46 +307,41 @@ module Build
               return ACON::Command::Status::FAILURE
             end
             
-            if env_id && !env_id.blank?
-              # PATCH has merge semantics: send only the delta.
-              api.api_v1_environments_id_patch(env_id, updates)
-              if !show_json
-                output.puts "Setting config vars for environment... done".colorize(:green).to_s
-                updates.each do |key, value|
-                  output.puts "#{key}: #{value}"
+            # Chunk large batches to keep each request under upstream
+            # gateway timeouts. PATCH has merge semantics, so splitting is
+            # safe: each chunk adds its keys without disturbing others.
+            chunk_size = (input.option("chunk-size", type: String?).try(&.to_i?) || 20)
+            chunk_size = 1 if chunk_size < 1
+            chunks = updates.to_a.each_slice(chunk_size).to_a
+            target = env_id && !env_id.blank? ? "environment #{env_id}" : app_name_or_id.to_s
+
+            chunks.each_with_index do |pairs, idx|
+              chunk_hash = pairs.to_h
+              begin
+                if env_id && !env_id.blank?
+                  api.api_v1_environments_id_patch(env_id, chunk_hash)
+                else
+                  api.set_config_vars(app_name_or_id.not_nil!, chunk_hash)
                 end
-              end
-            else
-              # PATCH has merge semantics (matching Heroku's API): only keys in the
-              # payload are touched, absent keys are left unchanged. Send only the
-              # delta — sending the full set would trigger a deploy per key.
-              if app_name_or_id
-                api.set_config_vars(app_name_or_id, updates)
-                if !show_json
-                  output.puts "Setting config vars for #{app_name_or_id}... done".colorize(:green).to_s
-                  updates.each do |key, value|
-                    output.puts "#{key}: #{value}"
-                  end
+              rescue ex : Exception
+                if !show_json && idx > 0
+                  output.puts ">".colorize(:red).to_s + "   Partial failure: #{idx}/#{chunks.size} chunks applied before this error."
                 end
+                output.puts ">".colorize(:red).to_s + "   Error: #{friendly_error(ex)}"
+                return ACON::Command::Status::FAILURE
               end
             end
-            
-            if show_json
+
+            if !show_json
+              output.puts "Setting config vars for #{target}... done".colorize(:green).to_s
+              updates.each { |key, value| output.puts "#{key}: #{value}" }
+            else
               output.puts updates.to_json
             end
-            
+
             return ACON::Command::Status::SUCCESS
           rescue ex : Exception
-            error_msg = ex.message || ""
-            if error_msg.blank? || error_msg == ""
-              output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-              output.puts "      1. Is the server running? (rails server)"
-              output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-              output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-              output.puts "      Debug: #{ex.class.name}"
-            else
-              output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-            end
+            output.puts ">".colorize(:red).to_s + "   Error: #{friendly_error(ex)}"
             return ACON::Command::Status::FAILURE
           end
         end
