@@ -188,13 +188,48 @@ module Build
         protected def configure : Nil
           self
             .name("config:set")
-            .usage("config:set KEY1=VALUE1 [KEY2=VALUE2 ...] -a my-app  OR  -e ENV-ID")
-            .description("Set a config variable for an app or environment.")
-            .argument("KEY=VALUE", ACON::Input::Argument::Mode[:required, :is_array], "The name and value of the config variable(s) to set.")
+            .usage("config:set KEY1=VALUE1 [KEY2=VALUE2 ...] -a my-app  OR  -e ENV-ID  OR  ... < env.out")
+            .description("Set config variables for an app or environment. Reads from STDIN when piped.")
+            .argument("KEY=VALUE", ACON::Input::Argument::Mode[:optional, :is_array], "The name and value of the config variable(s) to set. Omit to read from STDIN.")
             .option("app", "a", :optional, "The name of the application.")
             .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
             .option("json", "j", :none, "Output in JSON format.")
-            .help("Set a config variable for an app or environment.")
+            .help(<<-HELP
+            Set config variables for an app or environment.
+
+            Values can be provided as KEY=VALUE arguments, or piped on STDIN using
+            the shell format emitted by `bld config -s` (KEY=value or KEY='value').
+            Blank lines, `#` comments, and an optional `export` prefix are ignored.
+
+            Examples:
+              bld config:set KEY1=val1 KEY2=val2 -a my-app
+              bld config -a src-app -s | bld config:set -a dst-app
+              bld config -a src-app -s > env.out && bld config:set -a dst-app < env.out
+            HELP
+            )
+        end
+
+        # Parse shell-style env lines from STDIN. Matches the output of
+        # `config:list -s` and is lenient enough to accept common .env formats.
+        private def parse_stdin_env(raw : String) : Hash(String, String)
+          result = Hash(String, String).new
+          raw.each_line do |line|
+            line = line.strip
+            next if line.empty? || line.starts_with?("#")
+            line = line.sub(/^export\s+/, "")
+            idx = line.index('=')
+            next unless idx
+            key = line[0...idx].strip
+            val = line[(idx + 1)..]
+            next if key.empty?
+            if val.size >= 2 && val.starts_with?('\'') && val.ends_with?('\'')
+              val = val[1...-1].gsub("'\\''", "'")
+            elsif val.size >= 2 && val.starts_with?('"') && val.ends_with?('"')
+              val = val[1...-1].gsub("\\\"", "\"").gsub("\\\\", "\\")
+            end
+            result[key] = val
+          end
+          result
         end
         
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -214,12 +249,8 @@ module Build
             end
             
             varname_values = input.argument("KEY=VALUE", type: Array(String))
-            if varname_values.empty?
-              output.puts("<error>   Must specify KEY and VALUE </error>")
-              return ACON::Command::Status::FAILURE
-            end
-            
-            # Parse the key=value pairs
+
+            # Parse the key=value pairs from arguments
             updates = Hash(String, String).new
             varname_values.each do |varname_value|
               if varname_value !~ /=/
@@ -232,6 +263,23 @@ module Build
                 return ACON::Command::Status::FAILURE
               end
               updates[varname] = value
+            end
+
+            # Merge in any values piped on STDIN (shell format from `config -s`).
+            # CLI args take precedence over STDIN on key conflicts.
+            if !STDIN.tty?
+              stdin_data = STDIN.gets_to_end
+              unless stdin_data.empty?
+                stdin_updates = parse_stdin_env(stdin_data)
+                stdin_updates.each do |k, v|
+                  updates[k] = v unless updates.has_key?(k)
+                end
+              end
+            end
+
+            if updates.empty?
+              output.puts("<error>   Must specify KEY=VALUE or pipe shell-format env vars on STDIN</error>")
+              return ACON::Command::Status::FAILURE
             end
             
             if env_id && !env_id.blank?
