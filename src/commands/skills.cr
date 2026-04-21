@@ -151,9 +151,16 @@ module Build
         # Restart all
         bld ps:restart -a APP
 
-        # Run a one-off command
+        # Run a one-off command (args passed literally — no shell re-parsing)
         bld run bash -a APP
-        bld run 'rails console' -a APP
+        bld run rails console -a APP
+
+        # Use -c when you want the remote shell to interpret metacharacters
+        bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a APP
+
+        # Pipe a local file as stdin to avoid quoting entirely
+        bld run rails runner -a APP --file script.rb
+        bld run rails runner -a APP < script.rb
 
         # Exec into a running dyno
         bld ps:exec 'ls -la /app' -a APP

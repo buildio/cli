@@ -25,11 +25,42 @@ module Build
           .option("no-tty", nil, :none, "Force the command to not run in a tty")
           .option("exit-code", "x", :none, "Passthrough the exit code of the remote command")
           .option("file", "f", :optional, "Send a local file as stdin to the remote command")
+          .option("shell", "c", :none, "Pass the command to the remote shell for interpretation (enables $VAR, globs, pipes, multi-command)")
           .description("Run a command in a once-off dyno on the Build platform")
-          .help("This command is used to run a once-off dyno on the Build platform. It is useful for running tasks that are not part of a web process type such as database migrations, console sessions, or one-off scripts. The run command takes a command to run as an argument. The command will be executed in a one-off dyno on the Build platform.\n\nUse --file to pipe a local file as stdin to the remote command, avoiding shell escaping issues:\n  bld run rails runner -a my-app --file script.rb\n  bld run ruby -a my-app --file migrate.rb\n\nYou can also pipe via stdin directly:\n  bld run rails runner -a my-app < script.rb")
+          .help(<<-HELP
+          Run a one-off command on the Build platform. Useful for migrations,
+          console sessions, or ad-hoc scripts.
+
+          By default each argument is POSIX single-quoted before being sent to
+          the remote side, so parentheses, braces, quotes, $VAR, globs, and
+          other shell metacharacters reach the target process literally:
+
+            bld run ruby -e 'puts ENV["HOME"]' -a my-app
+            bld run rake 'test:unit[foo,bar]' -a my-app
+
+          Use -c/--shell when you actually want the remote shell to interpret
+          metacharacters (variable expansion, pipes, multiple commands):
+
+            bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a my-app
+
+          Use --file (or stdin redirection) to send a local file as stdin and
+          sidestep quoting entirely:
+
+            bld run rails runner -a my-app --file script.rb
+            bld run rails runner -a my-app < script.rb
+          HELP
+          )
           .usage("bash -a my-app")
           .usage("rails runner -a my-app --file script.rb")
+          .usage("-c 'echo $HOME | wc -c' -a my-app")
           #.aliases(["exec", "shell", "console"])
+      end
+
+      # POSIX single-quote escape: wraps arg in '...' and encodes embedded
+      # single quotes as '\''. This is the only portable shell quoting form
+      # that suppresses all expansion — no $VAR, no backticks, no globs.
+      private def sh_quote(arg : String) : String
+        "'" + arg.gsub("'", "'\\''") + "'"
       end
 
       # Sentinel used to capture exit code from remote command
@@ -141,20 +172,15 @@ module Build
             if !command_array.empty?
               # Build display command (what user sees) vs execution command
               display_cmd = command_array.join(" ")
-              cmd_string = if command_array.size == 1
-                # Single argument: pass through as-is
-                # This allows `bld run "rake test"` to work like `bld run rake test`
-                "/cnb/lifecycle/launcher #{command_array[0]}"
+              shell_mode = input.option("shell", type: Bool)
+              cmd_string = if shell_mode
+                # -c/--shell: user explicitly wants remote shell interpretation
+                # (variables, globs, pipes, multi-command). Pass args through raw.
+                "/cnb/lifecycle/launcher #{command_array.join(" ")}"
               else
-                # Multiple arguments: quote args containing spaces or double quotes
-                quoted_args = command_array.map do |arg|
-                  if arg.includes?(" ") || arg.includes?("\"")
-                    "\"" + arg.gsub("\"", "\\\"") + "\""
-                  else
-                    arg
-                  end
-                end
-                "/cnb/lifecycle/launcher #{quoted_args.join(" ")}"
+                # Default: single-quote every arg so the remote shell cannot
+                # re-interpret parens, braces, quotes, $VAR, backticks, or globs.
+                "/cnb/lifecycle/launcher #{command_array.map { |a| sh_quote(a) }.join(" ")}"
               end
               # Append exit code sentinel if --exit-code is enabled
               if exit_code_mode
