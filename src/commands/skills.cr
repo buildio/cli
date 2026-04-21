@@ -119,6 +119,13 @@ module Build
         # Set vars (multiple at once)
         bld config:set KEY1=val1 KEY2=val2 -a APP
 
+        # Copy all vars from one app to another (via STDIN, shell format)
+        bld config -a SRC_APP -s | bld config:set -a DST_APP
+
+        # Save to a file, then restore from it
+        bld config -a SRC_APP -s > env.out
+        bld config:set -a DST_APP < env.out
+
         # Unset a var
         bld config:unset KEY -a APP
 
