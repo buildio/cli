@@ -2,10 +2,11 @@ require "io/console"
 require "uuid"
 require "term-spinner"
 require "netrc"
+require "../env_format"
 
 module Build
   module Commands
-    module Config 
+    module Config
       @[ACONA::AsCommand("config:list")]
       class List < Base
         protected def configure : Nil
@@ -58,11 +59,7 @@ module Build
               output.puts config_vars.to_json
             elsif input.option("shell", type: Bool)
               config_vars.each do |key, value|
-                if value.match(/^[0-9a-zA-Z_\-\.]+$/)
-                  output.puts "#{key}=#{value}"
-                else
-                  output.puts "#{key}='#{value.gsub(/'/, "'\\\\''")}'"
-                end
+                output.puts Build::EnvFormat.shell_format_kv(key, value)
               end
             else
               entity_name = (env_id && !env_id.blank?) ? "Environment #{env_id}" : app_name_or_id
@@ -153,12 +150,7 @@ module Build
               output.puts result.to_json
             elsif input.option("shell", type: Bool)
               varnames.each do |varname|
-                value = config_vars[varname]
-                if value.match(/^[0-9a-zA-Z_\-\.]+$/)
-                  output.puts "#{varname}=#{value}"
-                else
-                  output.puts "#{varname}='#{value.gsub(/'/, "'\\\\''")}'"
-                end
+                output.puts Build::EnvFormat.shell_format_kv(varname, config_vars[varname])
               end
             else
               varnames.each do |varname|
@@ -234,29 +226,13 @@ module Build
           end
         end
 
-        # Parse shell-style env lines from STDIN. Matches the output of
-        # `config:list -s` and is lenient enough to accept common .env formats.
+        # Parser lives in Build::EnvFormat. See env_format.cr for grammar
+        # and the security guarantee (this never evaluates shell).
         private def parse_stdin_env(raw : String) : Hash(String, String)
-          result = Hash(String, String).new
-          raw.each_line do |line|
-            line = line.strip
-            next if line.empty? || line.starts_with?("#")
-            line = line.sub(/^export\s+/, "")
-            idx = line.index('=')
-            next unless idx
-            key = line[0...idx].strip
-            val = line[(idx + 1)..]
-            next if key.empty?
-            if val.size >= 2 && val.starts_with?('\'') && val.ends_with?('\'')
-              val = val[1...-1].gsub("'\\''", "'")
-            elsif val.size >= 2 && val.starts_with?('"') && val.ends_with?('"')
-              val = val[1...-1].gsub("\\\"", "\"").gsub("\\\\", "\\")
-            end
-            result[key] = val
-          end
-          result
+          Build::EnvFormat.parse(raw)
         end
-        
+
+
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           begin
             app_name_or_id = input.option("app", type: String?)
