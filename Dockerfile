@@ -10,7 +10,7 @@ RUN apk upgrade \
     && wget https://github.com/openssl/openssl/releases/download/openssl-3.6.2/openssl-3.6.2.tar.gz \
     && tar xzf openssl-3.6.2.tar.gz \
     && cd openssl-3.6.2 \
-    && ./Configure linux-x86_64 no-shared --prefix=/usr --openssldir=/etc/ssl \
+    && ./Configure linux-x86_64 no-shared enable-deprecated --prefix=/usr --openssldir=/etc/ssl \
     && make -j$(nproc) \
     && make install_sw \
     && cd .. && rm -rf openssl-3.6.2 openssl-3.6.2.tar.gz \
