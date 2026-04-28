@@ -1,8 +1,9 @@
-FROM crystallang/crystal:1.20.0-alpine
+FROM crystallang/crystal:1.20.0
 
 WORKDIR /workspace
 
-RUN apk upgrade \
-    && apk add --update --no-cache ca-certificates libssh2-static lz4-dev lz4-static yaml-static gmp-dev gmp-static
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libssh2-1-dev libssl-dev libgmp-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . /workspace
