@@ -14,6 +14,9 @@ RUN apk upgrade \
     && make -j$(nproc) \
     && make install_sw \
     && cd .. && rm -rf openssl-3.6.2 openssl-3.6.2.tar.gz \
+    && printf 'int EVP_MD_get_size(const void*);\nint EVP_MD_size(const void *md){return EVP_MD_get_size(md);}\n' \
+       | gcc -xc -c -o /tmp/compat.o - \
+    && ar r /usr/lib/libcrypto.a /tmp/compat.o && rm /tmp/compat.o \
     && /usr/bin/openssl version
 
 COPY . /workspace
