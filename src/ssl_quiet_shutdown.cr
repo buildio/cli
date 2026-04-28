@@ -1,20 +1,28 @@
 require "openssl"
 
-# Tell OpenSSL to skip the bidirectional close_notify handshake when
-# shutting down TLS connections. Without this, SSL_shutdown raises
-# when the remote (typically a load-balancer) has already closed the
-# TCP socket — even though the request completed successfully.
-#
-# This matches the behavior of curl, Go's net/http, and most HTTP
-# clients. Real SSL errors (bad cert, connection refused, read/write
-# failures) are unaffected — only the shutdown handshake is skipped.
-lib LibSSL
-  fun ssl_set_quiet_shutdown = SSL_set_quiet_shutdown(ssl : SSL, mode : LibC::Int)
-end
+# Crystal's OpenSSL::SSL::Socket#unbuffered_close raises on any
+# SSL_shutdown error that isn't WANT_READ, WANT_WRITE, or SYSCALL.
+# Behind load-balancers that close TCP before TLS close_notify, this
+# raises "decryption failed or bad record mac" even though the
+# request completed. Patch unbuffered_close to treat all shutdown
+# errors as non-fatal — matching curl, Go, and Python behavior.
+# Real SSL errors (cert, connect, read, write) are unaffected.
+abstract class OpenSSL::SSL::Socket < IO
+  def unbuffered_close : Nil
+    return if @closed
+    @closed = true
 
-class OpenSSL::SSL::Socket::Client
-  def initialize(io, context : OpenSSL::SSL::Context::Client = OpenSSL::SSL::Context::Client.new, sync_close : Bool = false, hostname : String? = nil)
-    previous_def
-    LibSSL.ssl_set_quiet_shutdown(@ssl, 1)
+    begin
+      loop do
+        ret = LibSSL.ssl_shutdown(@ssl)
+        break if ret == 1
+        break if ret == 0 && sync_close?
+        break if ret < 0 # treat all shutdown errors as non-fatal
+      end
+    ensure
+      if sync_close?
+        bio.io.close
+      end
+    end
   end
 end
