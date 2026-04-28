@@ -13,7 +13,7 @@ dependencies:
   term-spinner:
     github: crystal-term/spinner
   netrc:
-    github: matthewchigira/crystal-netrc
+    github: usiegj00/crystal-netrc
   ssh2:
     github: spider-gazelle/ssh2.cr
     version: "~> 1.7.2"
