@@ -1,28 +1,19 @@
 require "openssl"
 
-# Crystal's OpenSSL::SSL::Socket#unbuffered_close raises on any
-# SSL_shutdown error that isn't WANT_READ, WANT_WRITE, or SYSCALL.
-# Behind load-balancers that close TCP before TLS close_notify, this
-# raises "decryption failed or bad record mac" even though the
-# request completed. Patch unbuffered_close to treat all shutdown
-# errors as non-fatal — matching curl, Go, and Python behavior.
-# Real SSL errors (cert, connect, read, write) are unaffected.
-abstract class OpenSSL::SSL::Socket < IO
-  def unbuffered_close : Nil
-    return if @closed
-    @closed = true
+# Alpine's statically-linked OpenSSL 3.3.1 raises during SSL_shutdown
+# when the remote has already closed the TCP connection (common behind
+# load-balancers). Dynamically-linked OpenSSL 3.6.2 handles it fine.
+#
+# Fix: set quiet shutdown at the context level so ALL sockets created
+# from any context skip the close_notify handshake. This is what curl,
+# Go, and Python do for HTTP clients.
+lib LibSSL
+  fun ssl_ctx_set_quiet_shutdown = SSL_CTX_set_quiet_shutdown(ctx : SSLContext, mode : LibC::Int)
+end
 
-    begin
-      loop do
-        ret = LibSSL.ssl_shutdown(@ssl)
-        break if ret == 1
-        break if ret == 0 && sync_close?
-        break if ret < 0 # treat all shutdown errors as non-fatal
-      end
-    ensure
-      if sync_close?
-        bio.io.close
-      end
-    end
+class OpenSSL::SSL::Context::Client
+  def initialize(method : LibSSL::SSLMethod = Context.default_method)
+    previous_def
+    LibSSL.ssl_ctx_set_quiet_shutdown(@handle, 1)
   end
 end
