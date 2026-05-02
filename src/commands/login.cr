@@ -36,7 +36,9 @@ module Build
         frames  = cyan + magenta
         spinner = Term::Spinner.new(":spinner Waiting for login", frames: frames, format: :dots, success_mark: "✓".colorize(:green).to_s, error_mark: "✗".colorize(:red).to_s)
         spinner.auto_spin # Automatic animation with default interval
-        launch_browser(oauth_url)
+        unless launch_browser(oauth_url)
+          output.puts "Could not open a browser automatically. Please open the URL above manually to continue."
+        end
         # Loop:
         poll_interval = 1
         timeout_seconds = (5 * 60)
