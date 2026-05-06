@@ -9,15 +9,18 @@ module Build
           self
             .name("pipelines:list")
             .description("list your pipelines")
+            .option("team", "t", :required, "Filter by team name or ID")
             .option("json", "j", :none, "Output in JSON format")
-            .help("Lists pipelines accessible to the current user")
+            .help("Lists pipelines accessible to the current user.\n\nUse -t to filter by team.")
+            .usage("pipelines -t my-team")
             .aliases(["pipelines"])
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api  # Ensure authentication is set up
+          team_filter = input.option("team", type: String?)
           pipelines_api = Build::PipelinesApi.new
-          pipelines = pipelines_api.list_pipelines.sort_by(&.name)
+          pipelines = pipelines_api.list_pipelines(team_id: team_filter).sort_by(&.name)
 
           if input.option("json", type: Bool)
             output.puts pipelines.to_json
