@@ -1,18 +1,29 @@
 def prompt_any_key(prompt : String) : Char
   mark = "?".colorize(:light_blue)
   print "#{mark} #{prompt} "
+  unless STDIN.tty?
+    puts
+    return '\n'
+  end
   char = STDIN.raw &.read_char
   puts char
   char || 'q'
 end
-def launch_browser(url)
+def launch_browser(url) : Bool
   {% if flag?(:darwin) %}
-    Process.run("open #{url}", shell: true)
+    status = Process.run("open #{url}", shell: true, output: Process::Redirect::Close, error: Process::Redirect::Close)
+    status.success?
   {% elsif flag?(:win32) %}
-    Process.run("start #{url}", shell: true)
+    status = Process.run("start #{url}", shell: true, output: Process::Redirect::Close, error: Process::Redirect::Close)
+    status.success?
   {% elsif flag?(:unix) %}
-    Process.run("xdg-open #{url}", shell: true)
+    status = Process.run("xdg-open #{url}", shell: true, output: Process::Redirect::Close, error: Process::Redirect::Close)
+    status.success?
+  {% else %}
+    false
   {% end %}
+rescue
+  false
 end
 def dots_spinner(status = nil)
   frames = %w{⠙ ⠹ ⠸ ⠼ ⠴}
