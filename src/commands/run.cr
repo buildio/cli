@@ -23,7 +23,7 @@ module Build
           .option("app", "a", :required, "The app to run the command on")
           .option("debug", nil, :none, "Show verbose debugging information")
           .option("no-tty", nil, :none, "Force the command to not run in a tty")
-          .option("detach", "d", :none, "Run via API in a fresh container (no SSH required)")
+          .option("detach", "d", :none, "Run non-interactively in a fresh container")
           .option("type", "t", :optional, "Process type for detached run (default: worker)")
           .option("size", "s", :optional, "Dyno size for detached run (default: from formation)")
           .option("timeout", nil, :optional, "Timeout in seconds for detached run (30-1800, default: 300)")
@@ -94,7 +94,7 @@ module Build
         command_array = input.argument("cmd", type: Array(String)) rescue [] of String
         file_path = input.option("file", type: String?)
 
-        # --detach: run via API in a fresh container (no SSH)
+        # --detach: run via API in a fresh container
         if detach
           if command_array.empty?
             output.puts "<error>   Command is required for detached mode</error>"
@@ -139,26 +139,26 @@ module Build
         SSH2::Session.open(ssh_host, ssh_port) do |session|
           spinner.update(status: "Logging in")
           if verbose
-            output.puts "SSH connection established"
+            output.puts "Connection established"
             output.puts "Authenticating with app: #{app.name}"
           end
           
           begin
             session.login(app.name, user_token)
             if verbose
-              output.puts "SSH authentication successful"
+              output.puts "Authentication successful"
             end
           rescue e : SSH2::SessionError
             spinner.error("Login failed")
             if verbose
-              output.puts "SSH authentication error: #{e.message}"
+              output.puts "Authentication error: #{e.message}"
             end
             exit
           end
 
           spinner.update(status: "Opening channel")
           if verbose
-            output.puts "Opening SSH channel"
+            output.puts "Opening channel"
           end
           
           session.open_session do |channel|
@@ -306,7 +306,7 @@ module Build
         ACON::Command::Status::SUCCESS
       end
 
-      # Reads output from the SSH channel and writes to STDOUT
+      # Reads output from the channel and writes to STDOUT
       # Returns the exit code if exit_code_mode is enabled and sentinel is found
       private def read_channel_output(channel, output, verbose, exit_code_mode) : Int32?
         buffer = Bytes.new(4096)
