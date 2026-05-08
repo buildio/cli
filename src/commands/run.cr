@@ -35,8 +35,7 @@ module Build
           Run a one-off command on the Build platform. Useful for migrations,
           console sessions, or ad-hoc scripts.
 
-          By default, runs via SSH (interactive, with PTY). Use --detach/-d to
-          run via API in a fresh container — no SSH or ContainerSSH required.
+          Use --detach/-d to run non-interactively in a fresh container:
 
             bld run -d -a my-app -- rails db:migrate
             bld run -d -a my-app -t worker -s Standard-2X -- rake heavy:task
@@ -46,14 +45,16 @@ module Build
           other shell metacharacters reach the target process literally:
 
             bld run ruby -e 'puts ENV["HOME"]' -a my-app
+            bld run rake 'test:unit[foo,bar]' -a my-app
 
           Use -c/--shell when you actually want the remote shell to interpret
           metacharacters (variable expansion, pipes, multiple commands):
 
             bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a my-app
 
-          Use --file (or stdin redirection) to send a local file as stdin:
+          Use stdin redirection or --file to send a local file:
 
+            bld run rails runner -a my-app < script.rb
             bld run rails runner -a my-app --file script.rb
           HELP
           )
