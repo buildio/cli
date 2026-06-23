@@ -111,8 +111,10 @@ module Build
           else
             output.puts "App created:"
             output.puts ""
-            output.puts "  Name: #{app.name}"
-            output.puts "  ID:   #{app.id}"
+            output.puts "  Name:    #{app.name}"
+            output.puts "  ID:      #{app.id}"
+            output.puts "  Git URL: #{app.git_url}" if app.git_url
+            output.puts "  Web URL: #{app.web_url}" if app.web_url
           end
           return ACON::Command::Status::SUCCESS
         end
