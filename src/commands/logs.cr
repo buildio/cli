@@ -39,7 +39,7 @@ module Build
         zone = input.option("zone")
         query_params["zone"] = zone if zone
 
-        user_token = Netrc.read[Build.api_host].try &.password
+        user_token = self.token
         if user_token.nil?
           output.puts "You need to be logged in to run a command."
           return ACON::Command::Status::FAILURE
@@ -51,7 +51,8 @@ module Build
 
         # output.puts("Query params: #{query_params}")
         # output.puts("Params: #{params}")
-        log_url_res = HTTP::Client.get(URI.new("https", Build.api_host, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
+        api_uri = Build.parsed_api_uri
+        log_url_res = HTTP::Client.get(URI.new(api_uri.scheme, api_uri.host, api_uri.port, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
         if log_url_res.status_code != 200
           output.puts("Failed to get log URL for app #{app}.")
           return ACON::Command::Status::FAILURE
