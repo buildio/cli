@@ -1,6 +1,7 @@
 require "term-spinner"
 require "http/web_socket"
 require "base64"
+require "../time_format"
 
 module Build
   module Commands
@@ -45,24 +46,28 @@ module Build
             output.puts("=== #{dyno._type.colorize.green.bold} (#{dyno.size.colorize.cyan.bold}): #{dyno.display.colorize.white.bold} (#{dyno.processes.size.colorize.yellow.bold})")
             dyno.processes.each do |process|
               # output.puts("  #{process.index}: #{process.status} (#{process.started_at}) #{process.restarts} restarts")
-              # Specify the expected format of the timestamp (ISO 8601 in this example)
-              started_at = Time.parse(process.started_at, "%Y-%m-%dT%H:%M:%S.%LZ", location: Time::Location::UTC)
+              # Parse leniently: the API's timestamp shape varies, and an
+              # unparseable value should not crash the whole listing.
+              started_at = Build::TimeFormat.parse?(process.started_at)
               status = process.status == "Running" ? "up".colorize.green : "down".colorize.red
 
-              # dotiw = (Time.utc - started_at).total_seconds.to_i.seconds
-              dotiw = distance_of_time_in_words(started_at)
-
-              entry = "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " +
-                "#{started_at.to_s.colorize(:dark_gray)} (~ #{dotiw.colorize.yellow} ago)"
-
+              when_str = if started_at
+                "#{started_at.to_s.colorize(:dark_gray)} (~ #{distance_of_time_in_words(started_at).colorize.yellow} ago)"
+              else
+                process.started_at.to_s.colorize(:dark_gray).to_s
+              end
+              entry = "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " + when_str
 
               restarts     = process.restarts
               restarted_at = process.restarted_at
               if restarted_at && restarts && restarts > 0
                 entry += " #{process.restarts} restarts"
-                restarted_at_time = Time.parse(restarted_at, "%Y-%m-%dT%H:%M:%S.%LZ", location: Time::Location::UTC)
-                dotiw = distance_of_time_in_words(restarted_at_time)
-                entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+                if restarted_at_time = Build::TimeFormat.parse?(restarted_at)
+                  dotiw = distance_of_time_in_words(restarted_at_time)
+                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+                else
+                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)})"
+                end
               end
               output.puts entry
             end
