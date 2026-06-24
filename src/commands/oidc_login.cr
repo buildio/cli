@@ -10,7 +10,7 @@ require "netrc"
 # accepts the authorization, the command polls the Build API to get the user's token.
 module Build
   module Commands
-    @[ACONA::AsCommand("run")]
+    @[ACONA::AsCommand("oidc-login")]
     class OidcLogin < Base
       protected def configure : Nil
         self
