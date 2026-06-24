@@ -162,8 +162,8 @@ module Build
         bld run rails runner -a APP --file script.rb
         bld run rails runner -a APP < script.rb
 
-        # Exec into a running dyno
-        bld ps:exec 'ls -la /app' -a APP
+        # Exec into a running dyno (--dyno is required; command goes after --)
+        bld ps:exec -a APP -d web.1 -- ls -la /app
 
         --- Buildpacks ---
 
@@ -216,12 +216,12 @@ module Build
         # 3. Provision:
         #    bld addons:create schema-to-go:mini -a APP
 
-        # Destroy
-        bld addons:destroy ADDON_NAME
+        # Destroy (--app is required)
+        bld addons:destroy ADDON_NAME -a APP
 
-        # Attach/detach across apps
+        # Attach an addon to another app; detach by attachment ID
         bld addons:attach ADDON_NAME -a OTHER_APP
-        bld addons:detach ADDON_NAME -a OTHER_APP
+        bld addons:detach ATTACHMENT_ID
 
         --- Domains ---
 
@@ -259,7 +259,7 @@ module Build
         --- Logs ---
 
         bld logs -a APP                        # Stream logs (follow)
-        bld logs -a APP -n 200                 # Last 200 lines
+        bld logs -a APP -c 200                 # Last 200 lines
 
         --- Teams ---
 
