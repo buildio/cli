@@ -138,6 +138,16 @@ module Build
             exit
           end
 
+          # Disable Nagle's algorithm on the SSH transport. Interactive shells
+          # send ~1 byte per keystroke; with Nagle on (the Crystal/ssh2 default)
+          # each small packet waits on the peer's delayed-ACK timer (~40ms+),
+          # which is the "lag while typing" users feel. OpenSSH sets TCP_NODELAY
+          # on interactive sessions for the same reason.
+          session.socket.as(TCPSocket).tcp_nodelay = true
+          if verbose
+            output.puts "TCP_NODELAY enabled on SSH socket"
+          end
+
           spinner.update(status: "Opening channel")
           if verbose
             output.puts "Opening SSH channel"
@@ -206,7 +216,9 @@ module Build
               STDIN.noecho do
                 STDIN.raw do
                   spawn do
-                    buffer = Bytes.new(1)
+                    # 4096 like the non-TTY path: read() returns on the first
+                    # byte (keystrokes still forward instantly) but batches pastes.
+                    buffer = Bytes.new(4096)
                     slice = buffer.to_slice
                     loop do
                       count = STDIN.read(slice)
