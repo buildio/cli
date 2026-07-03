@@ -1,6 +1,7 @@
 require "athena-console"
 require "./utils"
 require "./log_colorizer"
+require "./update_check"
 require "./commands/base"
 require "./commands/**"
 require "uri"
@@ -123,6 +124,11 @@ application.add Build::Commands::Domains::Clear.new
 application.add Build::Commands::Domains::Info.new
 application.add Build::Commands::Domains::Update.new
 application.add Build::Commands::Domains::Wait.new
+
+# Check for a newer released version on GitHub. Cached to at most one
+# request per day and silently no-ops on any failure or when disabled via
+# BUILD_NO_UPDATE_CHECK.
+Build::UpdateCheck.check!(VERSION)
 
 # Run the application.
 # By default this uses STDIN and STDOUT for its input and output.
