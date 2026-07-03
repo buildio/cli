@@ -47,6 +47,41 @@ describe Build::UpdateCheck do
         io.to_s.should be_empty
       end
     end
+
+    it "skips when io is not a TTY (non-interactive)" do
+      # IO::Memory.tty? is false, so this exercises the interactivity gate.
+      io = IO::Memory.new
+      Build::UpdateCheck.check!("1.0.0", io)
+      io.to_s.should be_empty
+    end
+  end
+
+  describe ".fast_path?" do
+    it "detects --version / --help / _complete in ARGV" do
+      {"--version", "-V", "--help", "-h", "_complete"}.each do |token|
+        original = ARGV.dup
+        begin
+          ARGV.clear
+          ARGV << token
+          Build::UpdateCheck.fast_path?.should be_true
+        ensure
+          ARGV.clear
+          original.each { |a| ARGV << a }
+        end
+      end
+    end
+
+    it "is false for normal command invocations" do
+      original = ARGV.dup
+      begin
+        ARGV.clear
+        ARGV << "apps:list"
+        Build::UpdateCheck.fast_path?.should be_false
+      ensure
+        ARGV.clear
+        original.each { |a| ARGV << a }
+      end
+    end
   end
 end
 
