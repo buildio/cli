@@ -92,6 +92,10 @@ Conventions to follow:
 - `BUILD_API_KEY` — bearer token, bypasses `~/.netrc`.
 - `BUILD_DEFAULT_REGION` — default `us-east-1`.
 - `DEBUG=1` — verbose CLI + SDK logging.
+- `BUILD_NO_UPDATE_CHECK=1` — disable the once-per-day GitHub release check
+  that prints an "update available" notice on STDERR. State is piggybacked on
+  `~/.netrc` as a synthetic `bld-update-check` machine entry, so no additional
+  dotfile is created. See `src/update_check.cr`.
 
 ## Note: `bld skills`
 
