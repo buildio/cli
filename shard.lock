@@ -34,9 +34,9 @@ shards:
 
   term-cursor:
     git: https://github.com/crystal-term/cursor.git
-    version: 0.3.1
+    version: 1.0.0
 
   term-spinner:
     git: https://github.com/crystal-term/spinner.git
-    version: 0.3.2
+    version: 1.0.0
 
