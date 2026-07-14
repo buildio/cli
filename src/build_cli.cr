@@ -65,6 +65,7 @@ application = ACON::Application.new "Build.io CLI", version: VERSION
 
 # Register commands using the `#add` method
 application.add Build::Commands::Whoami.new
+application.add Build::Commands::Signup.new
 application.add Build::Commands::Login.new
 application.add Build::Commands::OidcLogin.new
 {% unless flag?(:win32) %}
