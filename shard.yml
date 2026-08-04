@@ -12,6 +12,7 @@ dependencies:
     version: 1.1.38
   term-spinner:
     github: crystal-term/spinner
+    commit: a65ca1a204736393cd701dc0f65af8154cb93912
   netrc:
     github: usiegj00/crystal-netrc
   ssh2:
