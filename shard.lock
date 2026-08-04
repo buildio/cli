@@ -38,5 +38,5 @@ shards:
 
   term-spinner:
     git: https://github.com/crystal-term/spinner.git
-    version: 1.0.0
+    version: 1.0.0+git.commit.a65ca1a204736393cd701dc0f65af8154cb93912
 
