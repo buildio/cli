@@ -1,4 +1,5 @@
 require "athena-console"
+require "./ext/term_spinner"
 require "./utils"
 require "./log_colorizer"
 require "./update_check"
@@ -7,7 +8,12 @@ require "./commands/**"
 require "uri"
 
 VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
-Colorize.on_tty_only! # Don't colorize output if not on a TTY
+# Don't colorize output if not on a TTY. This is the default behaviour since
+# Crystal 1.17 (crystal-lang/crystal#15881), which also deprecated
+# `Colorize.on_tty_only!`, so only call it on the older compilers we support.
+{% if compare_versions(Crystal::VERSION, "1.17.0") < 0 %}
+  Colorize.on_tty_only!
+{% end %}
 
 module Build
   private DEFAULT_API_URL = "https://app.build.io"
