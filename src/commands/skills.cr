@@ -58,7 +58,7 @@ module Build
         git remote add bld "$GIT_URL"
 
         # 6. Deploy via git push
-        git push bld main
+        git push build main
 
         # 7. Scale processes
         bld ps:scale web=2:Standard-1X worker=1 -a my-app
@@ -279,9 +279,9 @@ module Build
         4. Deploy via git push — get the URL with:
              bld apps:info -a APP -j | jq -r '.git_url'
         5. Chain creation + deploy:
-             NAME=$(bld apps:create foo -t team -j | jq -r '.name')
+             NAME=$(bld apps:create APP -t team -j | jq -r '.name')
              GIT_URL=$(bld apps:info -a "$NAME" -j | jq -r '.git_url')
-             git remote add bld "$GIT_URL" && git push bld main
+             git remote add build "$GIT_URL" && git push build main
         6. Config changes take effect on next deploy or dyno restart.
         7. Buildpack changes take effect on next deploy.
         8. Scale changes take effect immediately.
