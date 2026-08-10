@@ -74,6 +74,11 @@ module Build
 
         --- Authentication ---
 
+        bld signup -e user@example.com         # Sign up (sends a verification
+                                               # email; run `bld login` after).
+                                               # Region access is granted
+                                               # separately — a new account may
+                                               # not have access to any region.
         bld login                              # Browser-based OAuth login
         bld whoami                             # Show current user
 
