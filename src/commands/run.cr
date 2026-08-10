@@ -23,6 +23,10 @@ module Build
           .option("app", "a", :required, "The app to run the command on")
           .option("debug", nil, :none, "Show verbose debugging information")
           .option("no-tty", nil, :none, "Force the command to not run in a tty")
+          .option("detach", "d", :none, "Run non-interactively in a fresh container")
+          .option("type", "t", :optional, "Process type for detached run (default: worker)")
+          .option("size", "s", :optional, "Dyno size for detached run (default: from formation)")
+          .option("timeout", nil, :optional, "Timeout in seconds for detached run (30-1800, default: 300)")
           .option("exit-code", "x", :none, "Passthrough the exit code of the remote command")
           .option("file", "f", :optional, "Send a local file as stdin to the remote command")
           .option("shell", "c", :none, "Pass the command to the remote shell for interpretation (enables $VAR, globs, pipes, multi-command)")
@@ -30,6 +34,11 @@ module Build
           .help(<<-HELP
           Run a one-off command on the Build platform. Useful for migrations,
           console sessions, or ad-hoc scripts.
+
+          Use --detach/-d to run non-interactively in a fresh container:
+
+            bld run -d -a my-app -- rails db:migrate
+            bld run -d -a my-app -t worker -s Standard-2X -- rake heavy:task
 
           By default each argument is POSIX single-quoted before being sent to
           the remote side, so parentheses, braces, quotes, $VAR, globs, and
@@ -43,11 +52,10 @@ module Build
 
             bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a my-app
 
-          Use --file (or stdin redirection) to send a local file as stdin and
-          sidestep quoting entirely:
+          Use stdin redirection or --file to send a local file:
 
-            bld run rails runner -a my-app --file script.rb
             bld run rails runner -a my-app < script.rb
+            bld run rails runner -a my-app --file script.rb
           HELP
           )
           .usage("bash -a my-app")
@@ -81,9 +89,19 @@ module Build
 
         verbose = input.option("debug", type: Bool)
         no_tty = input.option("no-tty", type: Bool)
+        detach = input.option("detach", type: Bool)
         exit_code_mode = input.option("exit-code", type: Bool)
         command_array = input.argument("cmd", type: Array(String)) rescue [] of String
         file_path = input.option("file", type: String?)
+
+        # --detach: run via API in a fresh container
+        if detach
+          if command_array.empty?
+            output.puts "<error>   Command is required for detached mode</error>"
+            return ACON::Command::Status::FAILURE
+          end
+          return run_detached(app_id, command_array, input, output)
+        end
 
         # Validate --file if specified
         if file_path && !File.exists?(file_path)
@@ -121,19 +139,19 @@ module Build
         SSH2::Session.open(ssh_host, ssh_port) do |session|
           spinner.update(status: "Logging in")
           if verbose
-            output.puts "SSH connection established"
+            output.puts "Connection established"
             output.puts "Authenticating with app: #{app.name}"
           end
           
           begin
             session.login(app.name, user_token)
             if verbose
-              output.puts "SSH authentication successful"
+              output.puts "Authentication successful"
             end
           rescue e : SSH2::SessionError
             spinner.error("Login failed")
             if verbose
-              output.puts "SSH authentication error: #{e.message}"
+              output.puts "Authentication error: #{e.message}"
             end
             exit
           end
@@ -150,7 +168,7 @@ module Build
 
           spinner.update(status: "Opening channel")
           if verbose
-            output.puts "Opening SSH channel"
+            output.puts "Opening channel"
           end
           
           session.open_session do |channel|
@@ -267,7 +285,40 @@ module Build
         return ACON::Command::Status::SUCCESS
       end
 
-      # Reads output from the SSH channel and writes to STDOUT
+      # Run via API — creates a fresh K8s Job, waits for output, returns it.
+      private def run_detached(app_id : String, command_array : Array(String), input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
+        command = command_array.join(" ")
+        type = input.option("type", type: String?) || "worker"
+        size = input.option("size", type: String?)
+        timeout = input.option("timeout", type: String?).try(&.to_i)
+
+        spinner = dots_spinner("Running '#{command}' on #{app_id} (#{type})")
+
+        request = Build::DynoRunRequest.new(
+          command: command,
+          _type: type,
+          size: size,
+          timeout: timeout
+        )
+
+        begin
+          result = api.run_dyno(app_id, request)
+        rescue ex : Exception
+          spinner.error
+          output.puts "<error>   #{ex.message}</error>"
+          return ACON::Command::Status::FAILURE
+        end
+
+        spinner.success
+        output.print result.output if result
+        if result && result.status != "succeeded"
+          output.puts "Process exited with status: #{result.status}".colorize(:red).to_s
+          return ACON::Command::Status::FAILURE
+        end
+        ACON::Command::Status::SUCCESS
+      end
+
+      # Reads output from the channel and writes to STDOUT
       # Returns the exit code if exit_code_mode is enabled and sentinel is found
       private def read_channel_output(channel, output, verbose, exit_code_mode) : Int32?
         buffer = Bytes.new(4096)
