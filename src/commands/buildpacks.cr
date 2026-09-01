@@ -7,9 +7,9 @@ module Build
 
       def self.display(output, app_name : String, buildpacks : Array(String))
         if buildpacks.empty?
-          output.puts "#{app_name} has no Buildpacks."
+          output.puts Build.t("runtime.buildpacks.none", app: app_name)
         else
-          output.puts "=== #{app_name} Buildpack#{buildpacks.size == 1 ? "" : "s"}"
+          output.puts Build.t("runtime.buildpacks.title", app: app_name, plural: buildpacks.size == 1 ? "" : "s")
           output.puts ""
           buildpacks.each_with_index do |bp, i|
             output.puts "#{i + 1}. #{bp}"
@@ -18,11 +18,11 @@ module Build
       end
 
       def self.display_after_mutation(output, verb : String, app_name : String, buildpacks : Array(String))
-        output.puts "Buildpack #{verb}."
+        output.puts Build.t("runtime.buildpacks.mutated", verb: verb)
         if buildpacks.empty?
-          output.puts "#{app_name} has no Buildpacks."
+          output.puts Build.t("runtime.buildpacks.none", app: app_name)
         else
-          output.puts "Next release on #{app_name} will use:"
+          output.puts Build.t("runtime.buildpacks.next_release", app: app_name)
           buildpacks.each_with_index do |bp, i|
             output.puts "  #{i + 1}. #{bp}"
           end
@@ -41,23 +41,17 @@ module Build
         protected def configure : Nil
           self
             .name("buildpacks:list")
-            .description("List the buildpacks for an app.")
-            .option("app", "a", :optional, "The app.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Display the buildpacks configured for an application, in order.
-
-            Example:
-              $ bld buildpacks -a my-app
-            HELP
-            )
+            .description(t("commands.buildpacks.list.description"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.buildpacks.list.help"))
             .aliases(["buildpacks"])
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           installations = buildpacks_api.list_buildpacks(app_input)
@@ -76,25 +70,18 @@ module Build
         protected def configure : Nil
           self
             .name("buildpacks:add")
-            .description("Add a buildpack to an app.")
-            .argument("buildpack", :required, "The buildpack URL or name to add.")
-            .option("app", "a", :optional, "The app.")
-            .option("index", "i", :optional, "1-based position to insert at.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Append a buildpack to the list, or insert at a specific position with -i.
-
-            Examples:
-              $ bld buildpacks:add heroku/nodejs -a my-app
-              $ bld buildpacks:add heroku/ruby -a my-app -i 1
-            HELP
-            )
+            .description(t("commands.buildpacks.add.description"))
+            .argument("buildpack", :required, t("commands.buildpacks.common.arguments.buildpack"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("index", "i", :optional, t("commands.buildpacks.common.options.index_insert"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.buildpacks.add.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           buildpack = input.argument("buildpack", type: String)
@@ -102,7 +89,7 @@ module Build
 
           current = Buildpacks.urls_from(buildpacks_api.list_buildpacks(app_input))
           if current.includes?(buildpack)
-            output.puts "The buildpack #{buildpack} is already set on #{app_input}."
+            output.puts t("runtime.buildpacks.already_set", buildpack: buildpack, app: app_input)
             return ACON::Command::Status::FAILURE
           end
 
@@ -118,7 +105,7 @@ module Build
             output.puts result.to_json
           else
             app = api.app(app_input)
-            Buildpacks.display_after_mutation(output, "added", app.name.not_nil!, Buildpacks.urls_from(result))
+            Buildpacks.display_after_mutation(output, t("runtime.verbs.added"), app.name.not_nil!, Buildpacks.urls_from(result))
           end
           ACON::Command::Status::SUCCESS
         end
@@ -129,25 +116,18 @@ module Build
         protected def configure : Nil
           self
             .name("buildpacks:set")
-            .description("Set a buildpack on an app.")
-            .argument("buildpack", :required, "The buildpack URL or name to set.")
-            .option("app", "a", :optional, "The app.")
-            .option("index", "i", :optional, "1-based position to replace.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Replace the first buildpack (or the one at a given index) with a new one.
-
-            Examples:
-              $ bld buildpacks:set heroku/nodejs -a my-app
-              $ bld buildpacks:set heroku/ruby -a my-app -i 2
-            HELP
-            )
+            .description(t("commands.buildpacks.set.description"))
+            .argument("buildpack", :required, t("commands.buildpacks.common.arguments.buildpack"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("index", "i", :optional, t("commands.buildpacks.common.options.index_replace"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.buildpacks.set.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           buildpack = input.argument("buildpack", type: String)
@@ -161,7 +141,7 @@ module Build
           elsif idx >= 0 && idx < current.size
             current[idx] = buildpack
           else
-            output.puts "Invalid index: #{idx + 1}. App has #{current.size} buildpack#{current.size == 1 ? "" : "s"}."
+            output.puts t("runtime.buildpacks.invalid_index", index: idx + 1, count: current.size, plural: current.size == 1 ? "" : "s")
             return ACON::Command::Status::FAILURE
           end
 
@@ -170,7 +150,7 @@ module Build
             output.puts result.to_json
           else
             app = api.app(app_input)
-            Buildpacks.display_after_mutation(output, "set", app.name.not_nil!, Buildpacks.urls_from(result))
+            Buildpacks.display_after_mutation(output, t("runtime.verbs.set"), app.name.not_nil!, Buildpacks.urls_from(result))
           end
           ACON::Command::Status::SUCCESS
         end
@@ -181,36 +161,29 @@ module Build
         protected def configure : Nil
           self
             .name("buildpacks:remove")
-            .description("Remove a buildpack from an app.")
-            .argument("buildpack", :optional, "The buildpack URL or name to remove.")
-            .option("app", "a", :optional, "The app.")
-            .option("index", "i", :optional, "1-based index of buildpack to remove.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Remove a buildpack by name/URL or by index. Specify one, not both.
-
-            Examples:
-              $ bld buildpacks:remove heroku/nodejs -a my-app
-              $ bld buildpacks:remove -i 2 -a my-app
-            HELP
-            )
+            .description(t("commands.buildpacks.remove.description"))
+            .argument("buildpack", :optional, t("commands.buildpacks.common.arguments.buildpack"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("index", "i", :optional, t("commands.buildpacks.common.options.index_remove"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.buildpacks.remove.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           buildpack = input.argument("buildpack", type: String | Nil)
           index_str = input.option("index", type: String | Nil)
 
           if buildpack && index_str
-            output.puts "Specify a buildpack name or an index, not both."
+            output.puts t("runtime.buildpacks.specify_name_or_index_not_both")
             return ACON::Command::Status::FAILURE
           end
           if buildpack.nil? && index_str.nil?
-            output.puts "Specify a buildpack name or use -i to specify an index."
+            output.puts t("runtime.buildpacks.specify_name_or_index")
             return ACON::Command::Status::FAILURE
           end
 
@@ -219,14 +192,14 @@ module Build
           if index_str
             idx = index_str.to_i - 1
             if idx < 0 || idx >= current.size
-              output.puts "Invalid index: #{idx + 1}. App has #{current.size} buildpack#{current.size == 1 ? "" : "s"}."
+              output.puts t("runtime.buildpacks.invalid_index", index: idx + 1, count: current.size, plural: current.size == 1 ? "" : "s")
               return ACON::Command::Status::FAILURE
             end
             current.delete_at(idx)
           else
             bp = buildpack.not_nil!
             unless current.includes?(bp)
-              output.puts "Buildpack #{bp} is not set on #{app_input}."
+              output.puts t("runtime.buildpacks.not_set", buildpack: bp, app: app_input)
               return ACON::Command::Status::FAILURE
             end
             current.delete(bp)
@@ -237,7 +210,7 @@ module Build
             output.puts result.to_json
           else
             app = api.app(app_input)
-            Buildpacks.display_after_mutation(output, "removed", app.name.not_nil!, Buildpacks.urls_from(result))
+            Buildpacks.display_after_mutation(output, t("runtime.verbs.removed"), app.name.not_nil!, Buildpacks.urls_from(result))
           end
           ACON::Command::Status::SUCCESS
         end
@@ -248,29 +221,23 @@ module Build
         protected def configure : Nil
           self
             .name("buildpacks:clear")
-            .description("Clear all buildpacks for an app.")
-            .option("app", "a", :optional, "The app.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Remove all buildpacks from an application.
-
-            Example:
-              $ bld buildpacks:clear -a my-app
-            HELP
-            )
+            .description(t("commands.buildpacks.clear.description"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.buildpacks.clear.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           result = Buildpacks.put_buildpacks(buildpacks_api, app_input, [] of String)
           if input.option("json", type: Bool)
             output.puts result.to_json
           else
-            output.puts "Buildpacks cleared."
+            output.puts t("runtime.buildpacks.cleared")
           end
           ACON::Command::Status::SUCCESS
         end

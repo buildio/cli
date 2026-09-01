@@ -24,6 +24,10 @@ shards:
     git: https://github.com/mamantoha/http_proxy.git
     version: 0.15.1
 
+  i18n:
+    git: https://github.com/crystal-i18n/i18n.git
+    version: 0.2.2
+
   netrc:
     git: https://github.com/usiegj00/crystal-netrc.git
     version: 0.1.0+git.commit.668cac882b4ba9ce3c2ce3a6a92e7331d8afe9d8

@@ -1,4 +1,5 @@
 require "build-client"
+require "../display_width"
 
 module Build
   module Commands
@@ -17,7 +18,7 @@ module Build
         ent = Netrc.read[Build.api_host]
         user_token ||= ent.password if ent
         if user_token.nil?
-          puts ">".colorize(:red).to_s + "   Error: not logged in"
+          puts ">".colorize(:red).to_s + "   " + Build.t("runtime.errors.not_logged_in")
           exit(1)
         end
 
@@ -35,17 +36,46 @@ module Build
         api # ensure access_token is configured
         Build::BuildpacksApi.new
       end
+      def t(message_key : String | Symbol, params : Hash | NamedTuple | Nil = nil) : String
+        Build.t(message_key, params)
+      end
+
+      def t(message_key : String | Symbol, **kwargs) : String
+        Build.t(message_key, kwargs)
+      end
+
+      def print_error(output : ACON::Output::Interface, message : String) : Nil
+        output.puts ">".colorize(:red).to_s + "   " + t("runtime.errors.error", message: message)
+      end
+
+      def print_api_request_failed(output : ACON::Output::Interface, ex : Exception, local_server_hint : Bool = true) : Nil
+        output.puts ">".colorize(:red).to_s + "   " + t("runtime.errors.api_request_failed")
+        output.puts "      " + t(local_server_hint ? "runtime.errors.check_server_rails" : "runtime.errors.check_server")
+        output.puts "      " + t("runtime.errors.check_token")
+        output.puts "      " + t(local_server_hint ? "runtime.errors.check_api_url_local" : "runtime.errors.check_api_url")
+        output.puts "      " + t("runtime.errors.debug", class_name: ex.class.name)
+      end
+
+      def print_api_error(output : ACON::Output::Interface, ex : Exception, local_server_hint : Bool = true) : Nil
+        error_msg = ex.message || ""
+        if error_msg.blank? || error_msg == ""
+          print_api_request_failed(output, ex, local_server_hint)
+        else
+          print_error(output, error_msg)
+        end
+      end
 
       def print_table(output : ACON::Output::Interface, headers : Tuple, rows : Array(Tuple))
         widths = Array(Int32).new(headers.size, 0)
-        headers.each_with_index { |h, i| widths[i] = {widths[i], h.size}.max }
+        headers.each_with_index { |h, i| widths[i] = {widths[i], Build.display_width(h.to_s)}.max }
         rows.each do |row|
-          row.each_with_index { |val, i| widths[i] = {widths[i], val.size}.max if i < widths.size }
+          row.each_with_index { |val, i| widths[i] = {widths[i], Build.display_width(val.to_s)}.max if i < widths.size }
         end
-        fmt = widths.map_with_index { |w, i| i == widths.size - 1 ? "%s" : "%-#{w}s" }.join("  ")
-        output.puts fmt % headers
+        output.puts headers.each_with_index.map { |header, i| i == widths.size - 1 ? header.to_s : Build.ljust_display(header.to_s, widths[i]) }.join("  ")
         output.puts widths.map { |w| "─" * w }.join("  ")
-        rows.each { |row| output.puts fmt % row }
+        rows.each do |row|
+          output.puts row.each_with_index.map { |val, i| i == widths.size - 1 ? val.to_s : Build.ljust_display(val.to_s, widths[i]) }.join("  ")
+        end
       end
     end
   end

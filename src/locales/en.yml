@@ -1,0 +1,990 @@
+en:
+  console:
+    descriptor:
+      usage: "Usage:"
+      command_usage: "command [options] [arguments]"
+      available_commands: "Available commands:"
+      available_namespace_commands: "Available commands for the '%{namespace}' namespace:"
+      description: "Description:"
+      help: "Help:"
+      arguments: "Arguments:"
+      options: "Options:"
+      default: "[default: %{value}]"
+      multiple_values_allowed: "(multiple values allowed)"
+    global:
+      command: "The command to execute"
+      help: "Display help for the given command. When no command is given display help for the %{command} command"
+      quiet: "Do not output any message"
+      verbose: "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug"
+      version: "Display this application version"
+      ansi: "Force (or disable --no-ansi) ANSI output"
+      no_interaction: "Do not ask any interactive question"
+    commands:
+      help:
+        description: "Display help for a command"
+        argument: "The command name"
+        format: "The output format (txt)"
+        raw: "To output raw command help"
+        help: |
+          The <info>%command.name%</info> command displays help for a given command:
+
+            <info>%command.full_name% list</info>
+
+          To display the list of available commands, please use the <info>list</info> command.
+      list:
+        description: "List available commands"
+        argument: "Only list commands in this namespace"
+        raw: "To output raw command list"
+        format: "The output format (txt)"
+        short: "To skip describing command's arguments"
+        help: |
+          The <info>%command.name%</info> command lists all commands:
+
+            <info>%command.full_name%</info>
+
+          You can also display the commands for a specific namespace:
+
+            <info>%command.full_name% test</info>
+
+          It's also possible to get raw list of commands (useful for embedding command runner):
+
+            <info>%command.full_name% --raw</info>
+      completion:
+        description: "Dump the shell completion script"
+        argument: "The shell type (e.g. 'bash'), the value of the '$SHELL' env var will be used if not provided"
+        help: |
+          The <info>%command.name%</> command dumps the shell completion script required
+          to use shell autocompletion (currently, %{shells} completion are supported).
+
+          <comment>Static installation
+          -------------------</>
+
+          Dump the script to a global completion file and restart your shell:
+
+              <info>%command.full_name% %{shell} | sudo tee %{completion_file}</>
+
+          Or dump the script to a local file and source it:
+
+              <info>%command.full_name% %{shell} > completion.sh</>
+
+              <comment># source the file whenever you use the project</>
+              <info>source completion.sh</>
+
+              <comment># or add this line at the end of your "%{rc_file}" file:</>
+              <info>source /path/to/completion.sh</>
+
+          <comment>Dynamic installation
+          --------------------</>
+
+          Add this to the end of your shell configuration file (e.g. <info>"%{rc_file}"</>):
+
+              <info>eval "$(%{full_command} completion %{shell})"</>
+  commands:
+    common:
+      arguments:
+        addon: "Addon name or ID."
+        app: "The ID or NAME of the app."
+        namespace: "The namespace ID or name."
+        pipeline: "pipeline name or ID"
+        team: "The team ID or name"
+      options:
+        app: "The app."
+        app_id_or_name: "App name or ID."
+        app_name: "The name of the application."
+        environment: "The environment ID (for pipeline environments)."
+        json: "Output in JSON format."
+        namespace: "The namespace."
+        region: "The region (default: %{region})."
+        shell: "Output in shell format."
+        team: "Team name or ID."
+        zone: "The zone ID."
+    addons:
+      list:
+        description: "List addons for an app or team."
+        help: "List all addons provisioned for an app or team."
+      services:
+        description: "List available addon services."
+        help: "List all available addon services from the catalog."
+      plans:
+        description: "List plans for an addon service."
+        arguments:
+          service: "Addon service name (e.g. bld-postgres)."
+        help: "List available plans for an addon service."
+      create:
+        description: "Create an addon for an app."
+        arguments:
+          plan: "Addon service and plan (e.g. bld-postgres:essential-0)."
+        options:
+          name: "Custom name for the addon."
+          human_name: "Display name for the addon."
+          description: "Description for the addon."
+          config: "Config key=value (repeatable)."
+        help: "Provision a new addon for an app."
+      info:
+        description: "Show info about an addon."
+        help: "Show detailed information about an addon, including attachments."
+      destroy:
+        description: "Destroy an addon."
+        help: "Destroy an addon (deprovisions and removes from all attached apps)."
+      attach:
+        description: "Attach an addon to an app."
+        options:
+          app: "App name or ID to attach to."
+          as: "Attachment name (e.g. DATABASE_RED)."
+        help: "Attach an existing addon to an app."
+      detach:
+        description: "Detach an addon from an app."
+        arguments:
+          attachment: "Addon attachment ID."
+        help: "Detach an addon from an app."
+    apps:
+      list:
+        description: "List the apps you have access to."
+        help: |
+          List apps you have access to. By default, only personal apps are shown.
+          To see apps owned by a team, use the -t flag. Use `bld teams` to see
+          your available teams and their apps.
+
+          Examples:
+            $ bld apps                  # personal apps only
+            $ bld apps -t my-team       # apps for a specific team
+            $ bld teams                 # list teams to find team apps
+      info:
+        description: "Show the details of a specific application."
+      create:
+        description: "Create a new application."
+        arguments:
+          name: "The name of the app to create."
+        options:
+          team: "The team to create the app in."
+        help: "Create a new application."
+      stacks:
+        description: "Show the stack for an app."
+        help: |
+          Show the current stack for an application. The stack determines the
+          base operating system image used for builds and dynos.
+
+          Example:
+            $ bld apps:stacks -a my-app
+            Stack: heroku-24
+      stacks_set:
+        description: "Set the stack for an app."
+        arguments:
+          stack: "The stack to set (e.g. heroku-22, heroku-24)."
+        help: |
+          Set the build stack for an application. This determines the base
+          operating system image used for the next build. The change takes
+          effect on the next deployment.
+
+          Common stacks: heroku-20, heroku-22, heroku-24
+
+          Example:
+            $ bld apps:stacks:set heroku-24 -a my-app
+            Stack set to heroku-24 for my-app.
+    buildpacks:
+      common:
+        arguments:
+          buildpack: "The buildpack URL or name."
+        options:
+          index_insert: "1-based position to insert at."
+          index_replace: "1-based position to replace."
+          index_remove: "1-based index of buildpack to remove."
+      list:
+        description: "List the buildpacks for an app."
+        help: |
+          Display the buildpacks configured for an application, in order.
+
+          Example:
+            $ bld buildpacks -a my-app
+      add:
+        description: "Add a buildpack to an app."
+        help: |
+          Append a buildpack to the list, or insert at a specific position with -i.
+
+          Examples:
+            $ bld buildpacks:add heroku/nodejs -a my-app
+            $ bld buildpacks:add heroku/ruby -a my-app -i 1
+      set:
+        description: "Set a buildpack on an app."
+        help: |
+          Replace the first buildpack (or the one at a given index) with a new one.
+
+          Examples:
+            $ bld buildpacks:set heroku/nodejs -a my-app
+            $ bld buildpacks:set heroku/ruby -a my-app -i 2
+      remove:
+        description: "Remove a buildpack from an app."
+        help: |
+          Remove a buildpack by name/URL or by index. Specify one, not both.
+
+          Examples:
+            $ bld buildpacks:remove heroku/nodejs -a my-app
+            $ bld buildpacks:remove -i 2 -a my-app
+      clear:
+        description: "Clear all buildpacks for an app."
+        help: |
+          Remove all buildpacks from an application.
+
+          Example:
+            $ bld buildpacks:clear -a my-app
+    config:
+      list:
+        description: "Get the config variables for an app or environment."
+        help: "Display the config variables for an app or environment."
+      get:
+        description: "Get the config variables for an app or environment."
+        arguments:
+          key: "The name of the config variable(s) to get."
+        help: "Display the config variables for an app or environment."
+      set:
+        description: "Set config variables for an app or environment. Reads from STDIN when piped."
+        arguments:
+          key_value: "The name and value of the config variable(s) to set. Omit to read from STDIN."
+        options:
+          chunk_size: "Max vars per API call when setting many at once (default: 20)."
+        help: |
+          Set config variables for an app or environment.
+
+          Values can be provided as KEY=VALUE arguments, or piped on STDIN using
+          the shell format emitted by `bld config -s` (KEY=value or KEY='value').
+          Blank lines, `#` comments, and an optional `export` prefix are ignored.
+
+          Large batches are sent in chunks (default 20 vars per call) to avoid
+          upstream request timeouts. Tune with --chunk-size.
+
+          Examples:
+            bld config:set KEY1=val1 KEY2=val2 -a my-app
+            bld config -a src-app -s | bld config:set -a dst-app
+            bld config -a src-app -s > env.out && bld config:set -a dst-app < env.out
+            bld config:set -a my-app --chunk-size 10 < big.env
+      unset:
+        description: "Unset config variables for an app or environment."
+        arguments:
+          key: "The name of the config variable(s) to unset."
+        help: "Unset a config variable for an app or environment."
+    domains:
+      common:
+        arguments:
+          hostname: "The domain name."
+          hostname_add: "The domain name to add."
+          hostname_remove: "The domain name to remove."
+        options:
+          cert: "The name of the SSL cert to use for this domain."
+      list:
+        description: "List all domains for an app."
+        help: "List all domains (default domain + custom domains) for an app."
+      add:
+        description: "Add a domain to an app."
+        options:
+          wait: "Wait for domain to be active."
+        help: "Add a custom domain to an app."
+      remove:
+        description: "Remove a domain from an app."
+        help: "Remove a custom domain from an app."
+      clear:
+        description: "Clear all custom domains from an app."
+        help: "Remove all custom domains from an app. Platform domains cannot be removed."
+      info:
+        description: "Show detailed information about a domain."
+        help: "Display detailed information about a specific domain."
+      update:
+        description: "Update a domain's SSL certificate."
+        help: "Update a domain's SSL certificate configuration."
+      wait:
+        description: "Wait for a domain to become active."
+        help: "Wait for a domain to finish provisioning and become active."
+    login:
+      description: "Login to your Build account"
+      help: "This command is used to login to the Build API. The Build API token is stored in the user's netrc file. Because the commandline needs the token, it does a three-way OAuth authentication. This command requests a login authorization from Build, then opens a browser to have the users OAuth-accept that authorization. Once the user accepts the authorization, the command polls the Build API to get the user's token."
+    logs:
+      description: "Display the logs for an application."
+      help: "Display the logs for an application."
+      options:
+        process: "The Procfile process to display logs for."
+        tail: "Tail the logs."
+        count: "Number of lines to display."
+        source: "The log source to display from (app or build)."
+        zone: "The zone to retrieve logs from."
+    namespaces:
+      list:
+        description: "List the namespaces you are a member of"
+        help: "Namespaces include namespaces that you are a member of, and namespaces that you own."
+      info:
+        description: "Get information about a namespace"
+        help: "Get information about a namespace."
+      create:
+        description: "Create a new namespace"
+        arguments:
+          name: "The name of the namespace"
+        options:
+          team: "The team ID or name (default: personal)."
+        help: "Create a new namespace."
+      delete:
+        description: "Delete a namespace"
+        help: "Delete a namespace."
+    oidc_login:
+      description: "Login to your Build cluster"
+      options:
+        region: "The region of the cluster to access"
+      help: "Login to your Build cluster"
+    pipelines:
+      list:
+        description: "list your pipelines"
+        help: "Lists pipelines accessible to the current user.\n\nUse -t to filter by team."
+      info:
+        description: "show detailed information for a pipeline"
+        help: "Displays information about a specific pipeline"
+      diff:
+        description: "compares the latest release of this app to its downstream app(s)"
+        options:
+          app: "Source app to compare"
+        help: "Shows commit differences between a source app and its downstream pipeline targets.\n\nExamples:\n  bld pipelines:diff -a my-app-staging"
+      promote:
+        description: "promote the latest release of this app to its downstream app(s)"
+        options:
+          app: "Source app to promote"
+          to: "Comma-separated target app names (default: all downstream)"
+          no_wait: "Return immediately after creating the promotion"
+        help: "Promotes the latest release from a source app to its downstream pipeline targets.\n\nExamples:\n  bld pipelines:promote -a my-app-staging\n  bld pipelines:promote -a my-app-staging --to my-app-prod,my-app-prod-eu\n  bld pipelines:promote -a my-app-staging --no-wait"
+    ps:
+      list:
+        description: "List running processes for an application"
+        help: "List running processes for an application"
+      restart:
+        description: "Restart processes on the application"
+        arguments:
+          process: "The NAME of the process type to restart"
+        help: "Restart processes on the application"
+      scale:
+        description: "Scale process formation"
+        arguments:
+          args: "TYPE=QUANTITY[:SIZE] pairs (e.g. web=2:Standard-2X worker=1)"
+        help: "Scale process types. With no arguments, shows current formation.\n\nExamples:\n  ps:scale -a myapp web=2\n  ps:scale -a myapp web=2:Standard-2X worker=1"
+      exec:
+        description: "Execute a command in a running dyno"
+        options:
+          dyno: "The NAME of the dyno (e.g. web.1) to exec into"
+          status: "Show exec readiness for all dynos"
+        arguments:
+          cmd: "Command to run inside the dyno"
+        help: "Execute a command in a running dyno.\n\nWith no CMD, opens an interactive bash session.\nWith CMD, executes the command and returns output.\nWith --status, shows exec readiness per dyno."
+    run:
+      description: "Run a command in a once-off dyno on the Build platform"
+      arguments:
+        cmd: "The command to run"
+      options:
+        app: "The app to run the command on"
+        debug: "Show verbose debugging information"
+        no_tty: "Force the command to not run in a tty"
+        exit_code: "Passthrough the exit code of the remote command"
+        file: "Send a local file as stdin to the remote command"
+        shell: "Pass the command to the remote shell for interpretation (enables $VAR, globs, pipes, multi-command)"
+      help: |
+        Run a one-off command on the Build platform. Useful for migrations,
+        console sessions, or ad-hoc scripts.
+
+        By default each argument is POSIX single-quoted before being sent to
+        the remote side, so parentheses, braces, quotes, $VAR, globs, and
+        other shell metacharacters reach the target process literally:
+
+          bld run ruby -e 'puts ENV["HOME"]' -a my-app
+          bld run rake 'test:unit[foo,bar]' -a my-app
+
+        Use -c/--shell when you actually want the remote shell to interpret
+        metacharacters (variable expansion, pipes, multiple commands):
+
+          bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a my-app
+
+        Use --file (or stdin redirection) to send a local file as stdin and
+        sidestep quoting entirely:
+
+          bld run rails runner -a my-app --file script.rb
+          bld run rails runner -a my-app < script.rb
+    skills:
+      description: "Show how to use bld (useful for AI agents and LLMs)."
+      help: "Prints a comprehensive guide to Build.io CLI commands with examples."
+    teams:
+      list:
+        description: "List the teams you are a member of"
+        help: "Teams include teams that you are a member of, and teams that you own."
+      info:
+        description: "Get information about a team"
+        help: "Get information about a team."
+    whoami:
+      description: "Display the current logged in user"
+      help: "Build commands run through the CLI use the API with permission level of this user. To see the current user, run this command. To change users, see the login command."
+  runtime:
+    errors:
+      not_logged_in: "Error: not logged in"
+      not_logged_in_short: "Not logged in"
+      need_login_to_run: "You need to be logged in to run a command."
+      error: "Error: %{message}"
+      unknown: "Unknown error"
+      api_request_failed: "API request failed. Please check:"
+      check_server_rails: "1. Is the server running? (rails server)"
+      check_server: "1. Is the server running?"
+      check_token: "2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
+      check_api_url_local: "3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
+      check_api_url: "3. Is the API URL correct? Set BUILD_API_URL"
+      debug: "Debug: %{class_name}"
+      must_specify_app_id_or_name: "You must specify an app ID or NAME."
+      must_specify_app_option: "You must specify an app with -a or --app."
+      missing_app_option: "Missing required option --app"
+      missing_app_or_environment: "Missing required option --app or --environment"
+      app_and_environment_exclusive: "Cannot specify both --app and --environment"
+      missing_key_argument: "Missing required argument KEY"
+      missing_region: "Missing required option --region"
+      must_specify_team: "You must specify a team ID or name."
+      must_specify_namespace: "You must specify a namespace ID or name."
+      specify_app_or_team: "Specify --app or --team"
+      specify_app_with_app_flag: "specify an app with --app (-a)"
+      missing_app_or_dyno: "Missing required options --app and/or --dyno"
+    debug:
+      global_api_config: "[DEBUG] Setting up global API config with:"
+      host: "[DEBUG]   Host: %{host}"
+      scheme: "[DEBUG]   Scheme: %{scheme}"
+      sdk_debugging: "[DEBUG]   SDK Debugging: %{enabled}"
+    labels:
+      git_url: "Git URL:    %{value}"
+      region: "Region:     %{value}"
+      stack: "Stack:      %{value}"
+      web_url: "Web URL:    %{value}"
+      indented_name: "  Name:    %{value}"
+      indented_id: "  ID:      %{value}"
+      indented_git_url: "  Git URL: %{value}"
+      indented_web_url: "  Web URL: %{value}"
+      environment: "Environment %{id}"
+      app: "App: %{value}"
+      app_padded: "App:          %{value}"
+      display_name: "Display Name: %{value}"
+      description: "Description:  %{value}"
+      plan: "Plan:         %{value}"
+      service: "Service:      %{value}"
+      state: "State:        %{value}"
+      config_vars: "Config Vars:  %{value}"
+      config_vars_inline: "Config vars: %{vars}"
+      web_url_wide: "Web URL:      %{value}"
+      price: "Price:        %{value}"
+      id: "ID:          %{value}"
+      kind: "Kind:        %{value}"
+      status: "Status:      %{value}"
+      cname: "CNAME:       %{value}"
+      acm_status: "ACM Status:  %{value}"
+      acm_reason: "ACM Reason:  %{value}"
+      sni_endpoint: "SNI Endpoint: %{value}"
+      created: "Created:     %{value}"
+      updated: "Updated:     %{value}"
+    status:
+      up: "up"
+      down: "down"
+      ready: "ready"
+      not_ready: "not ready"
+    verbs:
+      added: "added"
+      set: "set"
+      removed: "removed"
+    apps:
+      list:
+        team_header: "Apps for team %{team}:"
+        personal_header: "Personal Apps you have access to:"
+        team_hint: "To see apps owned by a team, run: bld apps -t <team>"
+        teams_hint: "To list available teams, run: bld teams"
+      create:
+        created: "App created:"
+      stacks_set:
+        success: "Stack set to %{stack} for %{app}."
+    buildpacks:
+      none: "%{app} has no Buildpacks."
+      title: "=== %{app} Buildpack%{plural}"
+      mutated: "Buildpack %{verb}."
+      next_release: "Next release on %{app} will use:"
+      already_set: "The buildpack %{buildpack} is already set on %{app}."
+      invalid_index: "Invalid index: %{index}. App has %{count} buildpack%{plural}."
+      specify_name_or_index_not_both: "Specify a buildpack name or an index, not both."
+      specify_name_or_index: "Specify a buildpack name or use -i to specify an index."
+      not_set: "Buildpack %{buildpack} is not set on %{app}."
+      cleared: "Buildpacks cleared."
+    config:
+      list:
+        usage: "config:list -a my-app -s  OR  config:list -e ENV-ID -j"
+      get:
+        usage: "config:get KEY... -a my-app  OR  config:get KEY... -e ENV-ID"
+      set:
+        usage: "config:set KEY1=VALUE1 [KEY2=VALUE2 ...] -a my-app  OR  -e ENV-ID  OR  ... < env.out"
+      unset:
+        usage: "config:unset KEY1 [KEY2 ...] -a my-app  OR  -e ENV-ID"
+      vars_title: "%{target} Config Vars"
+      no_vars_set: "(no config vars set)"
+      upstream_gateway_error: "upstream gateway returned an error page%{status}. The backend likely timed out or errored mid-request. For large config:set batches, try a smaller --chunk-size."
+      must_be_key_value: "Must be in the format KEY=VALUE"
+      invalid_key_value: "%{value} is invalid. Must be in the format KEY=VALUE"
+      must_specify_key_value_or_stdin: "Must specify KEY=VALUE or pipe shell-format env vars on STDIN"
+      partial_failure: "Partial failure: %{index}/%{count} chunks applied before this error."
+      setting_done: "Setting config vars for %{target}... done"
+      unsetting_environment_done: "Unsetting config vars for environment... done"
+      unsetting_app_done: "Unsetting config vars for %{app}... done"
+      removed: "Removed: %{key}"
+    login:
+      prompt: "Press any key to open up the browser to login or q to exit"
+      opening_browser: "Opening browser to %{url}"
+      browser_open_failed: "Could not open a browser automatically. Please open the URL above manually to continue."
+      waiting: "Waiting for login"
+      failed: "Login failed"
+      logged_in_as: "Logged in as %{email}"
+    logs:
+      usage: "logs -t -a my-app -p web"
+      failed_url: "Failed to get log URL for app %{app}."
+    oidc_login:
+      usage: "oidc-login -r eu-west-1"
+    teams:
+      list:
+        header: "Teams you have access to:"
+      info:
+        title: "Team: %{name} (%{id})"
+    namespaces:
+      list:
+        header: "Namespaces you have access to:"
+      info:
+        title: "Namespace: %{name} (%{id})"
+      create:
+        created: "Namespace created: %{name}"
+    run:
+      usage:
+        bash: "bash -a my-app"
+        file: "rails runner -a my-app --file script.rb"
+        shell: "-c 'echo $HOME | wc -c' -a my-app"
+      no_app: "No app specified. Please use the --app option to specify the app to run the command on."
+      file_not_found: "File not found: %{path}"
+      spinner:
+        retrieving_region: "Retrieving app region"
+        connecting_server: "Connecting to server"
+        logging_in: "Logging in"
+        opening_channel: "Opening channel"
+        running: "Running %{command} on %{app}"
+        starting_shell: "Starting shell on %{app}"
+      verbose:
+        enabled: "Verbose mode enabled"
+        connecting: "Connecting to %{host}:%{port}"
+        terminal_size: "Terminal size: %{width}x%{height}"
+        ssh_established: "SSH connection established"
+        authenticating: "Authenticating with app: %{app}"
+        auth_success: "SSH authentication successful"
+        auth_error: "SSH authentication error: %{error}"
+        tcp_nodelay: "TCP_NODELAY enabled on SSH socket"
+        opening_channel: "Opening SSH channel"
+        requesting_pty: "Requesting PTY with terminal type: %{term}"
+        no_pty: "Running without PTY (--no-tty or non-interactive)"
+        setting_env: "Setting environment variables"
+        executing: "Executing command: %{command}"
+        starting_shell: "Starting interactive shell"
+        channel_closed: "Channel closed by remote host"
+    ps:
+      list:
+        usage: "ps -a <app> [-j]"
+      restart:
+        usage: "ps:restart -a <app> [process]"
+        spinner_all: "Restarting the application %{app}"
+        spinner_process: "Restarting the %{process} process on the application %{app}"
+      exec:
+        usage: "ps:exec -a <app> -d <dyno> -- ls -l"
+        no_command_non_tty: "No command specified and stdin is not a TTY"
+        executing: "Executing '%{command}' on %{dyno}"
+        connecting: "Connecting to %{dyno}"
+      scale:
+        invalid_arg: "Invalid argument '%{arg}'. Use TYPE=QUANTITY[:SIZE]"
+        invalid_quantity: "Invalid quantity '%{quantity}' in '%{arg}'"
+        done: "Scaling %{label}... done"
+        failed: "Failed to scale: %{error}"
+        failed_get_formation: "Failed to get formation: %{error}"
+      no_processes_for_app: "No processes found for app %{app}"
+      no_processes: "No processes found"
+      restarts: "%{count} restarts"
+      last_restart_ago: "(last at %{time} ~ %{ago} ago)"
+      last_restart: "(last at %{time})"
+    addons:
+      headers:
+        slug: "slug"
+        name: "name"
+        summary: "summary"
+        state: "state"
+        default: "default"
+        price: "price"
+      default_marker: "default"
+      list:
+        none: "No addons for %{label}"
+        failed: "Failed to list addons: %{error}"
+      services:
+        failed: "Failed to list addon services: %{error}"
+      plans:
+        failed: "Failed to list plans: %{error}"
+      create:
+        done: "Creating %{plan} on %{app}... done, %{name} (%{state})"
+        available_plans: "Available plans: %{plans}"
+        plans_hint: "Run 'bld addons:plans %{service}' to see plan details."
+        services_hint: "Run 'bld addons:services' to see available services."
+        failed: "Failed to create addon: %{error}"
+        failed_no_error: "Failed to create addon"
+      info:
+        attachments_title: "=== Attachments"
+        failed: "Failed to get addon info: %{error}"
+      destroy:
+        done: "Destroying %{name} on %{app}... done"
+        failed: "Failed to destroy addon: %{error}"
+      attach:
+        done: "Attaching %{addon} as %{attachment} to %{app}... done"
+        failed: "Failed to attach addon: %{error}"
+      detach:
+        done: "Detaching %{attachment}... done"
+        failed: "Failed to detach addon: %{error}"
+    domains:
+      headers:
+        domain_name: "Domain Name"
+        dns_record_type: "DNS Record Type"
+        dns_target: "DNS Target"
+        sni_endpoint: "SNI Endpoint"
+      list:
+        failed: "Failed to list domains: %{error}"
+        none: "No domains found"
+        platform_title: "%{app} Build.io Domain"
+        custom_title: "%{app} Custom Domains"
+        no_custom: "No custom domains. Add one with: bld domains:add <hostname> -a <app-name>"
+      not_found: "Domain %{hostname} not found for app %{app}"
+      add:
+        added: "Added domain %{hostname} to %{app}"
+        failed: "Failed to add domain: %{error}"
+      remove:
+        removed: "Removed domain %{hostname} from %{app}"
+        failed: "Failed to remove domain: %{error}"
+      clear:
+        none: "No custom domains to clear for %{app}"
+        removed: "Removed domain %{hostname}"
+        cleared: "Cleared all custom domains from %{app}"
+        failed: "Failed to clear domains: %{error}"
+      info:
+        failed: "Failed to get domain info: %{error}"
+      update:
+        updated: "Updated domain %{hostname} for %{app}"
+        failed: "Failed to update domain: %{error}"
+      wait:
+        active: "Domain %{hostname} is active"
+        failed: "Failed to wait for domain: %{error}"
+        waiting: "Waiting for domain to become active..."
+        activation_failed: "Domain activation failed"
+        timeout: "Timeout waiting for domain activation"
+        check_failed: "Failed to check domain status: %{error}"
+    pipelines:
+      list:
+        usage: "pipelines -t my-team"
+        title: "=== Pipelines"
+      headers:
+        app_name: " app name"
+        stage: " stage"
+        sha: "SHA"
+        date: "Date"
+        author: "Author"
+        message: "Message"
+        app: " app"
+        status: " status"
+      info:
+        owner: "owner: %{owner} (team)"
+        environments: "Environments:"
+        no_apps: "No apps found in this pipeline."
+      app_not_in_pipeline: "App %{app} is not in a pipeline"
+      diff:
+        fetching: "Fetching diff"
+        no_downstream: "No downstream apps to compare."
+        not_compared: "%{source} was not compared to %{target}: %{error}"
+        up_to_date: "⬢ %{source} is up to date with ⬢ %{target}"
+        ahead: "ahead by %{count} commit%{plural}"
+        behind: "behind by %{count} commit%{plural}"
+        summary: "=== ⬢ %{source} is %{changes} vs ⬢ %{target}"
+      promote:
+        fetching_app: "Fetching app info"
+        all_downstream: "all downstream apps"
+        promoting: "Promoting %{app} to %{target}"
+        created: "Promotion %{id} created (status: %{status})"
+        waiting: "Waiting for promotion to complete"
+        completed_with_failures: "Promotion completed with failures."
+        successful: "Promotion successful."
+    update_check:
+      notice: |
+
+          A new release of bld is available: %{current} → %{latest}
+          https://github.com/%{repo}/releases/tag/v%{latest}
+          Set BUILD_NO_UPDATE_CHECK=1 to disable this check.
+    skills:
+      intro: |-
+        === Build.io CLI (bld) — Skills Reference
+
+        Build.io is a Heroku-compatible PaaS following 12-Factor App principles.
+        Apps are configured entirely through environment variables (config vars),
+        declare process types in a Procfile, and use buildpacks to compile code.
+
+        Key concepts:
+        - Config: all settings via ENV vars (DATABASE_URL, SECRET_KEY_BASE, etc.)
+        - Procfile: declares process types (web, worker, etc.) and their commands
+        - Buildpacks: auto-detected for common languages (Ruby, Node, Python, Go,
+          Java, etc.) or set explicitly for custom stacks
+        - Domains: each app gets a default URL; add custom domains with TLS
+        - Apps: start here for quick deployment of a single service
+        - Pipelines: graduate to pipelines (staging → production) for mature apps
+          with review apps, promotion, and diff support
+
+        All examples use -j (JSON output) with jq for reliable, parseable results.
+        This is the recommended approach for scripting and AI agents.
+      cold_start: |-
+        ============================================================
+        COLD START: From Nothing to a Running App
+        ============================================================
+
+        Your repo needs at minimum:
+        - A Procfile (e.g. `web: bundle exec puma -C config/puma.rb`)
+          or a language-standard entrypoint the buildpack can detect
+        - Buildpacks are auto-detected for most languages. Set them
+          explicitly only if auto-detection fails or you need multiple.
+
+        # 1. Login (one-time — saves credentials to ~/.netrc for API and git)
+        bld login
+
+        # 2. Create the app
+        bld apps:create my-app -t my-team -j | jq -r '.name'
+
+        # 3. Set buildpacks (if needed)
+        bld buildpacks:add heroku/nodejs -a my-app
+        bld buildpacks:add heroku/ruby -a my-app
+
+        # 4. Set config vars
+        bld config:set RAILS_ENV=production SECRET_KEY_BASE=abc123 -a my-app
+
+        # 5. Get the git URL and add it as a remote
+        GIT_URL=$(bld apps:info -a my-app -j | jq -r '.git_url')
+        git remote add bld "$GIT_URL"
+
+        # 6. Deploy via git push
+        git push build main
+
+        # 7. Scale processes
+        bld ps:scale web=2:Standard-1X worker=1 -a my-app
+
+        # 8. Verify it's running
+        bld ps -a my-app -j | jq '.[] | {type, state, command}'
+        WEB_URL=$(bld apps:info -a my-app -j | jq -r '.web_url')
+        curl -s "$WEB_URL" | head -20
+      command_reference_auth: |-
+        ============================================================
+        COMMAND REFERENCE (all with jq examples)
+        ============================================================
+
+        --- Authentication ---
+
+        bld login                              # Browser-based OAuth login
+        bld whoami                             # Show current user
+      command_reference_apps: |-
+        --- Apps ---
+
+        # List personal apps (names only)
+        bld apps -j | jq -r '.[].name'
+
+        # List apps for a team
+        bld apps -t my-team -j | jq -r '.[].name'
+
+        # Discover all apps: list teams first, then apps per team
+        bld teams -j | jq -r '.[].name'
+        bld apps -t TEAM -j | jq -r '.[].name'
+
+        # App details — extract specific fields
+        bld apps:info -a APP -j | jq '{name, git_url, web_url, region, stack}'
+
+        # Get the git push URL
+        bld apps:info -a APP -j | jq -r '.git_url'
+
+        # Get the web URL
+        bld apps:info -a APP -j | jq -r '.web_url'
+
+        # Create an app and capture its name
+        bld apps:create my-app -j | jq -r '.name'
+
+        # Create in a team
+        bld apps:create my-app -t my-team -j | jq -r '.name'
+
+        # Show/set stack
+        bld apps:stacks -a APP
+        bld apps:stacks:set heroku-24 -a APP
+      command_reference_config_vars: |-
+        --- Config Vars ---
+
+        # List all config vars as key=value
+        bld config -a APP -j | jq -r 'to_entries[] | "\(.key)=\(.value)"'
+
+        # Get a single var
+        bld config:get DATABASE_URL -a APP -j | jq -r '.DATABASE_URL'
+
+        # Set vars (multiple at once)
+        bld config:set KEY1=val1 KEY2=val2 -a APP
+
+        # Copy all vars from one app to another (via STDIN, shell format)
+        bld config -a SRC_APP -s | bld config:set -a DST_APP
+
+        # Save to a file, then restore from it
+        bld config -a SRC_APP -s > env.out
+        bld config:set -a DST_APP < env.out
+
+        # Unset a var
+        bld config:unset KEY -a APP
+      command_reference_git_push: |-
+        --- Git Push Deployment ---
+
+        # Full workflow to deploy an existing repo to an existing app:
+        GIT_URL=$(bld apps:info -a APP -j | jq -r '.git_url')
+        git remote add bld "$GIT_URL"    # one-time setup
+        git push bld main                # deploy
+
+        # Credentials are stored in ~/.netrc by `bld login` for both
+        # the API host and the git host, so git push works immediately.
+      command_reference_processes: |-
+        --- Processes (Dynos) ---
+
+        # List processes with state
+        bld ps -a APP -j | jq '.[] | {type, state, size, command}'
+
+        # Scale
+        bld ps:scale web=2 -a APP
+        bld ps:scale web=1:Standard-2X worker=3:Standard-1X -a APP
+
+        # Restart all
+        bld ps:restart -a APP
+
+        # Run a one-off command (args passed literally — no shell re-parsing)
+        bld run bash -a APP
+        bld run rails console -a APP
+
+        # Use -c when you want the remote shell to interpret metacharacters
+        bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a APP
+
+        # Pipe a local file as stdin to avoid quoting entirely
+        bld run rails runner -a APP --file script.rb
+        bld run rails runner -a APP < script.rb
+
+        # Exec into a running dyno (--dyno is required; command goes after --)
+        bld ps:exec -a APP -d web.1 -- ls -la /app
+      command_reference_buildpacks: |-
+        --- Buildpacks ---
+
+        # List buildpack URLs
+        bld buildpacks -a APP -j | jq -r '.[].buildpack.url'
+
+        # Add (append)
+        bld buildpacks:add heroku/nodejs -a APP
+
+        # Insert at position 1
+        bld buildpacks:add heroku/ruby -a APP -i 1
+
+        # Replace first buildpack
+        bld buildpacks:set heroku/python -a APP
+
+        # Remove by name
+        bld buildpacks:remove heroku/nodejs -a APP
+
+        # Remove by index
+        bld buildpacks:remove -i 2 -a APP
+
+        # Clear all
+        bld buildpacks:clear -a APP
+      command_reference_addons: |-
+        --- Addons ---
+
+        # List addons for an app
+        bld addons -a APP -j | jq '.[] | {name, plan: .plan.name, state}'
+
+        # Browse available services — IMPORTANT: use -j to see the summary
+        # field, which describes what the service actually is (e.g. "PostgreSQL
+        # as a Service"). The slug name alone is often not descriptive enough.
+        bld addons:services -j | jq '.[] | {name, summary, state}'
+
+        # Find a specific type of service (e.g. postgres)
+        bld addons:services -j | jq '.[] | select(.summary | test("postgres"; "i")) | {name, summary}'
+
+        # List plans and pricing for a service
+        bld addons:plans SERVICE -j | jq '.[] | {name, price}'
+
+        # Provision an addon
+        bld addons:create SERVICE:PLAN -a APP
+
+        # Example: provision a PostgreSQL database
+        # 1. Find the postgres service:
+        #    bld addons:services -j | jq '.[] | select(.summary | test("postgres"; "i")) | .name'
+        #    => "schema-to-go"
+        # 2. List plans:
+        #    bld addons:plans schema-to-go -j | jq '.[] | {name, price}'
+        # 3. Provision:
+        #    bld addons:create schema-to-go:mini -a APP
+
+        # Destroy (--app is required)
+        bld addons:destroy ADDON_NAME -a APP
+
+        # Attach an addon to another app; detach by attachment ID
+        bld addons:attach ADDON_NAME -a OTHER_APP
+        bld addons:detach ATTACHMENT_ID
+      command_reference_domains: |-
+        --- Domains ---
+
+        Every app gets a default *.onbld.com URL. Add custom domains for production:
+
+        # List domains
+        bld domains -a APP -j | jq -r '.[].hostname'
+
+        # Add a custom domain
+        bld domains:add www.example.com -a APP
+
+        # Point your DNS CNAME to the target shown by:
+        bld domains:info www.example.com -a APP -j | jq -r '.cname'
+
+        # TLS is provisioned automatically. Wait for it:
+        bld domains:wait www.example.com -a APP
+      command_reference_pipelines: |-
+        --- Pipelines (for mature apps) ---
+
+        Start with a single app for quick iteration. When ready for a
+        staging → production workflow, create a pipeline:
+
+        # List pipelines
+        bld pipelines -j | jq -r '.[].name'
+
+        # Pipeline details (shows apps per stage)
+        bld pipelines:info PIPELINE -j | jq '.'
+
+        # Compare staging to production (shows commit diff)
+        bld pipelines:diff -a my-app-staging
+
+        # Promote staging to production (zero-downtime)
+        bld pipelines:promote -a my-app-staging
+      command_reference_logs: |-
+        --- Logs ---
+
+        bld logs -a APP                        # Stream logs (follow)
+        bld logs -a APP -c 200                 # Last 200 lines
+      command_reference_teams: |-
+        --- Teams ---
+
+        # List your teams
+        bld teams -j | jq -r '.[].name'
+
+        # Team details
+        bld teams:info TEAM -j | jq '.'
+      tips: |-
+        ============================================================
+        TIPS FOR AI AGENTS
+        ============================================================
+
+        1. ALWAYS use -j (JSON) and parse with jq. Never regex text output.
+        2. Use -a APP on every command that targets an app.
+        3. Discover apps: `bld teams -j` then `bld apps -t TEAM -j` per team.
+        4. Deploy via git push — get the URL with:
+             bld apps:info -a APP -j | jq -r '.git_url'
+        5. Chain creation + deploy:
+             NAME=$(bld apps:create APP -t team -j | jq -r '.name')
+             GIT_URL=$(bld apps:info -a "$NAME" -j | jq -r '.git_url')
+             git remote add build "$GIT_URL" && git push build main
+        6. Config changes take effect on next deploy or dyno restart.
+        7. Buildpack changes take effect on next deploy.
+        8. Scale changes take effect immediately.

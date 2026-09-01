@@ -15,15 +15,15 @@ module Build
       protected def configure : Nil
         self
           .name("oidc-login")
-          .option("region", "r", :required, "The region of the cluster to access")
-          .description("Login to your Build cluster")
-          .help("Login to your Build cluster")
-          .usage("oidc-login -r eu-west-1")
+          .option("region", "r", :required, t("commands.oidc_login.options.region"))
+          .description(t("commands.oidc_login.description"))
+          .help(t("commands.oidc_login.help"))
+          .usage(t("runtime.oidc_login.usage"))
       end
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         region = input.option("region")
         unless region
-          output.puts "<error>   Missing required option --region</error>"
+          output.puts "<error>   #{t("runtime.errors.missing_region")}</error>"
           return ACON::Command::Status::FAILURE
         end
         output.puts api.oidc_login(region: region).to_json

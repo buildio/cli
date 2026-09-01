@@ -175,12 +175,10 @@ module Build
     end
 
     private def self.notice(current : String, latest : String) : String
-      String.build do |s|
-        s << "\n  A new release of bld is available: "
-        s << current.colorize(:yellow) << " → " << latest.colorize(:green) << "\n"
-        s << "  https://github.com/" << GITHUB_REPO << "/releases/tag/v" << latest << "\n"
-        s << "  Set BUILD_NO_UPDATE_CHECK=1 to disable this check.\n"
-      end
+      Build.t("runtime.update_check.notice",
+        current: current.colorize(:yellow).to_s,
+        latest: latest.colorize(:green).to_s,
+        repo: GITHUB_REPO)
     end
 
     # --- xattr syscall bindings ------------------------------------------

@@ -12,13 +12,13 @@ module Build
         protected def configure : Nil
           self
             .name("config:list")
-            .usage("config:list -a my-app -s  OR  config:list -e ENV-ID -j")
-            .description("Get the config variables for an app or environment.")
-            .option("app",   "a", :optional, "The name of the application.")
-            .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
-            .option("shell", "s", :none, "Output in shell format.")
-            .option("json",  "j", :none, "Output in JSON format.")
-            .help("Display the config variables for an app or environment.")
+            .usage(t("runtime.config.list.usage"))
+            .description(t("commands.config.list.description"))
+            .option("app",   "a", :optional, t("commands.common.options.app_name"))
+            .option("environment", "e", :optional, t("commands.common.options.environment"))
+            .option("shell", "s", :none, t("commands.common.options.shell"))
+            .option("json",  "j", :none, t("commands.common.options.json"))
+            .help(t("commands.config.list.help"))
             .aliases(["config"])
         end
         
@@ -29,12 +29,12 @@ module Build
             env_id = input.option("environment", type: String?)
             
             if (app_name_or_id.nil? || app_name_or_id.blank?) && (env_id.nil? || env_id.blank?)
-              output.puts("<error>   Missing required option --app or --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_app_or_environment")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
             if !(app_name_or_id.nil? || app_name_or_id.blank?) && !(env_id.nil? || env_id.blank?)
-              output.puts("<error>   Cannot specify both --app and --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.app_and_environment_exclusive")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -62,11 +62,11 @@ module Build
                 output.puts Build::EnvFormat.shell_format_kv(key, value)
               end
             else
-              entity_name = (env_id && !env_id.blank?) ? "Environment #{env_id}" : app_name_or_id
-              output.puts "===".colorize(:dark_gray).to_s + " #{entity_name} Config Vars".colorize.bold.to_s
+              entity_name = (env_id && !env_id.blank?) ? t("runtime.labels.environment", id: env_id) : app_name_or_id
+              output.puts "===".colorize(:dark_gray).to_s + " " + t("runtime.config.vars_title", target: entity_name).colorize.bold.to_s
               output.puts ""
               if config_vars.empty?
-                output.puts "(no config vars set)".colorize(:dark_gray).to_s
+                output.puts t("runtime.config.no_vars_set").colorize(:dark_gray).to_s
               else
                 key_width = config_vars.keys.map { |key| key.size }.max + 2
                 config_vars.each do |key, value|
@@ -76,16 +76,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue ex : Exception
-            error_msg = ex.message || ""
-            if error_msg.blank? || error_msg == ""
-              output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-              output.puts "      1. Is the server running? (rails server)"
-              output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-              output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-              output.puts "      Debug: #{ex.class.name}"
-            else
-              output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-            end
+            print_api_error(output, ex)
             return ACON::Command::Status::FAILURE
           end
         end
@@ -96,14 +87,14 @@ module Build
         protected def configure : Nil
           self
             .name("config:get")
-            .usage("config:get KEY... -a my-app  OR  config:get KEY... -e ENV-ID")
-            .description("Get the config variables for an app or environment.")
-            .argument("KEY", ACON::Input::Argument::Mode[:required, :is_array], "The name of the config variable(s) to get.")
-            .option("app", "a", :optional, "The name of the application.")
-            .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
-            .option("shell", "s", :none, "Output in shell format.")
-            .option("json",  "j", :none, "Output in JSON format.")
-            .help("Display the config variables for an app or environment.")
+            .usage(t("runtime.config.get.usage"))
+            .description(t("commands.config.get.description"))
+            .argument("KEY", ACON::Input::Argument::Mode[:required, :is_array], t("commands.config.get.arguments.key"))
+            .option("app", "a", :optional, t("commands.common.options.app_name"))
+            .option("environment", "e", :optional, t("commands.common.options.environment"))
+            .option("shell", "s", :none, t("commands.common.options.shell"))
+            .option("json",  "j", :none, t("commands.common.options.json"))
+            .help(t("commands.config.get.help"))
         end
         
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -112,12 +103,12 @@ module Build
             env_id = input.option("environment", type: String?)
             
             if (app_name_or_id.nil? || app_name_or_id.blank?) && (env_id.nil? || env_id.blank?)
-              output.puts("<error>   Missing required option --app or --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_app_or_environment")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
             if !(app_name_or_id.nil? || app_name_or_id.blank?) && !(env_id.nil? || env_id.blank?)
-              output.puts("<error>   Cannot specify both --app and --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.app_and_environment_exclusive")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -140,7 +131,7 @@ module Build
             
             varnames = input.argument("KEY", type: Array(String))
             if varnames.empty?
-              output.puts("<error>   Missing required argument KEY</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_key_argument")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -160,16 +151,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue ex : Exception
-            error_msg = ex.message || ""
-            if error_msg.blank? || error_msg == ""
-              output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-              output.puts "      1. Is the server running? (rails server)"
-              output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-              output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-              output.puts "      Debug: #{ex.class.name}"
-            else
-              output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-            end
+            print_api_error(output, ex)
             return ACON::Command::Status::FAILURE
           end
         end
@@ -180,30 +162,14 @@ module Build
         protected def configure : Nil
           self
             .name("config:set")
-            .usage("config:set KEY1=VALUE1 [KEY2=VALUE2 ...] -a my-app  OR  -e ENV-ID  OR  ... < env.out")
-            .description("Set config variables for an app or environment. Reads from STDIN when piped.")
-            .argument("KEY=VALUE", ACON::Input::Argument::Mode[:optional, :is_array], "The name and value of the config variable(s) to set. Omit to read from STDIN.")
-            .option("app", "a", :optional, "The name of the application.")
-            .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
-            .option("chunk-size", nil, :optional, "Max vars per API call when setting many at once (default: 20).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            Set config variables for an app or environment.
-
-            Values can be provided as KEY=VALUE arguments, or piped on STDIN using
-            the shell format emitted by `bld config -s` (KEY=value or KEY='value').
-            Blank lines, `#` comments, and an optional `export` prefix are ignored.
-
-            Large batches are sent in chunks (default 20 vars per call) to avoid
-            upstream request timeouts. Tune with --chunk-size.
-
-            Examples:
-              bld config:set KEY1=val1 KEY2=val2 -a my-app
-              bld config -a src-app -s | bld config:set -a dst-app
-              bld config -a src-app -s > env.out && bld config:set -a dst-app < env.out
-              bld config:set -a my-app --chunk-size 10 < big.env
-            HELP
-            )
+            .usage(t("runtime.config.set.usage"))
+            .description(t("commands.config.set.description"))
+            .argument("KEY=VALUE", ACON::Input::Argument::Mode[:optional, :is_array], t("commands.config.set.arguments.key_value"))
+            .option("app", "a", :optional, t("commands.common.options.app_name"))
+            .option("environment", "e", :optional, t("commands.common.options.environment"))
+            .option("chunk-size", nil, :optional, t("commands.config.set.options.chunk_size"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.config.set.help"))
         end
 
         # Translate an exception into a short, user-facing string. Upstream
@@ -218,7 +184,7 @@ module Build
                        body.includes?("<html")
           if looks_html
             status = code ? " (HTTP #{code})" : ""
-            "upstream gateway returned an error page#{status}. The backend likely timed out or errored mid-request. For large config:set batches, try a smaller --chunk-size."
+            t("runtime.config.upstream_gateway_error", status: status)
           elsif code
             "HTTP #{code}: #{body}"
           else
@@ -240,12 +206,12 @@ module Build
             show_json = input.option("json", type: Bool)
             
             if (app_name_or_id.nil? || app_name_or_id.blank?) && (env_id.nil? || env_id.blank?)
-              output.puts("<error>   Missing required option --app or --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_app_or_environment")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
             if !(app_name_or_id.nil? || app_name_or_id.blank?) && !(env_id.nil? || env_id.blank?)
-              output.puts("<error>   Cannot specify both --app and --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.app_and_environment_exclusive")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -255,12 +221,12 @@ module Build
             updates = Hash(String, String).new
             varname_values.each do |varname_value|
               if varname_value !~ /=/
-                output.puts("<error>   Must be in the format KEY=VALUE</error>")
+                output.puts("<error>   #{t("runtime.config.must_be_key_value")}</error>")
                 return ACON::Command::Status::FAILURE
               end
               varname, value = varname_value.split("=", 2)
               if varname.blank?
-                output.puts("<error>   #{varname_value} is invalid. Must be in the format KEY=VALUE</error>")
+                output.puts("<error>   #{t("runtime.config.invalid_key_value", value: varname_value)}</error>")
                 return ACON::Command::Status::FAILURE
               end
               updates[varname] = value
@@ -279,7 +245,7 @@ module Build
             end
 
             if updates.empty?
-              output.puts("<error>   Must specify KEY=VALUE or pipe shell-format env vars on STDIN</error>")
+              output.puts("<error>   #{t("runtime.config.must_specify_key_value_or_stdin")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -301,15 +267,15 @@ module Build
                 end
               rescue ex : Exception
                 if !show_json && idx > 0
-                  output.puts ">".colorize(:red).to_s + "   Partial failure: #{idx}/#{chunks.size} chunks applied before this error."
+                  output.puts ">".colorize(:red).to_s + "   " + t("runtime.config.partial_failure", index: idx, count: chunks.size)
                 end
-                output.puts ">".colorize(:red).to_s + "   Error: #{friendly_error(ex)}"
+                print_error(output, friendly_error(ex))
                 return ACON::Command::Status::FAILURE
               end
             end
 
             if !show_json
-              output.puts "Setting config vars for #{target}... done".colorize(:green).to_s
+              output.puts t("runtime.config.setting_done", target: target).colorize(:green).to_s
               updates.each { |key, value| output.puts "#{key}: #{value}" }
             else
               output.puts updates.to_json
@@ -317,7 +283,7 @@ module Build
 
             return ACON::Command::Status::SUCCESS
           rescue ex : Exception
-            output.puts ">".colorize(:red).to_s + "   Error: #{friendly_error(ex)}"
+            print_error(output, friendly_error(ex))
             return ACON::Command::Status::FAILURE
           end
         end
@@ -328,13 +294,13 @@ module Build
         protected def configure : Nil
           self
             .name("config:unset")
-            .usage("config:unset KEY1 [KEY2 ...] -a my-app  OR  -e ENV-ID")
-            .description("Unset config variables for an app or environment.")
-            .argument("KEY", :required, "The name of the config variable(s) to unset.")
-            .option("app", "a", :optional, "The name of the application.")
-            .option("environment", "e", :optional, "The environment ID (for pipeline environments).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Unset a config variable for an app or environment.")
+            .usage(t("runtime.config.unset.usage"))
+            .description(t("commands.config.unset.description"))
+            .argument("KEY", :required, t("commands.config.unset.arguments.key"))
+            .option("app", "a", :optional, t("commands.common.options.app_name"))
+            .option("environment", "e", :optional, t("commands.common.options.environment"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.config.unset.help"))
         end
         
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -344,18 +310,18 @@ module Build
             show_json = input.option("json", type: Bool)
             
             if (app_name_or_id.nil? || app_name_or_id.blank?) && (env_id.nil? || env_id.blank?)
-              output.puts("<error>   Missing required option --app or --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_app_or_environment")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
             if !(app_name_or_id.nil? || app_name_or_id.blank?) && !(env_id.nil? || env_id.blank?)
-              output.puts("<error>   Cannot specify both --app and --environment</error>")
+              output.puts("<error>   #{t("runtime.errors.app_and_environment_exclusive")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
             varnames = input.argument("KEY", type: Array(String))
             if varnames.empty?
-              output.puts("<error>   Missing required argument KEY</error>")
+              output.puts("<error>   #{t("runtime.errors.missing_key_argument")}</error>")
               return ACON::Command::Status::FAILURE
             end
             
@@ -365,9 +331,9 @@ module Build
                 api.api_v1_environments_id_key_delete(env_id, varname)
               end
               if !show_json
-                output.puts "Unsetting config vars for environment... done".colorize(:green).to_s
+                output.puts t("runtime.config.unsetting_environment_done").colorize(:green).to_s
                 varnames.each do |key|
-                  output.puts "Removed: #{key}"
+                  output.puts t("runtime.config.removed", key: key)
                 end
               end
             else
@@ -377,9 +343,9 @@ module Build
                   api.delete_config_var(app_name_or_id, varname)
                 end
                 if !show_json
-                  output.puts "Unsetting config vars for #{app_name_or_id}... done".colorize(:green).to_s
+                  output.puts t("runtime.config.unsetting_app_done", app: app_name_or_id).colorize(:green).to_s
                   varnames.each do |key|
-                    output.puts "Removed: #{key}"
+                    output.puts t("runtime.config.removed", key: key)
                   end
                 end
               end
@@ -391,16 +357,7 @@ module Build
             
             return ACON::Command::Status::SUCCESS
           rescue ex : Exception
-            error_msg = ex.message || ""
-            if error_msg.blank? || error_msg == ""
-              output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-              output.puts "      1. Is the server running? (rails server)"
-              output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-              output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-              output.puts "      Debug: #{ex.class.name}"
-            else
-              output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-            end
+            print_api_error(output, ex)
             return ACON::Command::Status::FAILURE
           end
         end

@@ -10,11 +10,11 @@ module Build
         protected def configure : Nil
           self
             .name("ps:list")
-            .description("List running processes for an application")
-            .option("app", "a", :required, "The ID or NAME of the application")
-            .option("json", "j", :none, "Output in JSON format")
-            .help("List running processes for an application")
-            .usage("ps -a <app> [-j]")
+            .description(t("commands.ps.list.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.ps.list.help"))
+            .usage(t("runtime.ps.list.usage"))
             .aliases(["ps", "ps:ls"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -22,7 +22,7 @@ module Build
           json_output = input.option("json", type: Bool?) || false
 
           if app_name_or_id.blank?
-            output.puts("<error>   Missing required option --app</error>")
+            output.puts("<error>   #{t("runtime.errors.missing_app_option")}</error>")
             return ACON::Command::Status::FAILURE
           end
           dynos = api.list_dynos(app_name_or_id)
@@ -30,7 +30,7 @@ module Build
             if json_output
               output.puts("[]")
             else
-              output.puts("<info>   No processes found for app #{app_name_or_id}</info>")
+              output.puts("<info>   #{t("runtime.ps.no_processes_for_app", app: app_name_or_id)}</info>")
             end
             return ACON::Command::Status::FAILURE
           end
@@ -45,7 +45,7 @@ module Build
             output.puts("=== #{dyno._type.colorize.green.bold} (#{dyno.size.colorize.cyan.bold}): #{dyno.display.colorize.white.bold} (#{dyno.processes.size.colorize.yellow.bold})")
             dyno.processes.each do |process|
               started_at_time = parse_timestamp?(process.started_at)
-              status = process.status == "Running" ? "up".colorize.green : "down".colorize.red
+              status = process.status == "Running" ? t("runtime.status.up").colorize.green : t("runtime.status.down").colorize.red
 
               entry = if started_at_time
                 dotiw = distance_of_time_in_words(started_at_time)
@@ -58,12 +58,12 @@ module Build
               restarts     = process.restarts
               restarted_at = process.restarted_at
               if restarted_at && restarts && restarts > 0
-                entry += " #{process.restarts} restarts"
+                entry += " " + t("runtime.ps.restarts", count: process.restarts)
                 if restarted_at_time = parse_timestamp?(restarted_at)
                   dotiw = distance_of_time_in_words(restarted_at_time)
-                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+                  entry += " " + t("runtime.ps.last_restart_ago", time: restarted_at.to_s.colorize(:dark_gray).to_s, ago: dotiw.colorize.yellow.to_s)
                 else
-                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)})"
+                  entry += " " + t("runtime.ps.last_restart", time: restarted_at.to_s.colorize(:dark_gray).to_s)
                 end
               end
               output.puts entry
@@ -84,24 +84,24 @@ module Build
         protected def configure : Nil
           self
             .name("ps:restart")
-            .description("Restart processes on the application")
-            .option("app", "a", :required, "The ID or NAME of the application")
-            .argument("process", :optional, "The NAME of the process type to restart")
-            .help("Restart processes on the application")
-            .usage("ps:restart -a <app> [process]")
+            .description(t("commands.ps.restart.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .argument("process", :optional, t("commands.ps.restart.arguments.process"))
+            .help(t("commands.ps.restart.help"))
+            .usage(t("runtime.ps.restart.usage"))
             .aliases(["restart"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name_or_id = input.option("app", type: String)
           if app_name_or_id.blank?
-            output.puts("<error>   Missing required option --app</error>")
+            output.puts("<error>   #{t("runtime.errors.missing_app_option")}</error>")
             return ACON::Command::Status::FAILURE
           end
           process_name = input.argument("process", type: String?)
           if process_name.nil?
-            spin = "Restarting the application #{app_name_or_id}"
+            spin = t("runtime.ps.restart.spinner_all", app: app_name_or_id)
           else
-            spin = "Restarting the #{process_name} process on the application #{app_name_or_id}"
+            spin = t("runtime.ps.restart.spinner_process", process: process_name, app: app_name_or_id)
           end
           spinner = dots_spinner(spin)
           if process_name.nil?
@@ -118,11 +118,11 @@ module Build
         protected def configure : Nil
           self
             .name("ps:scale")
-            .description("Scale process formation")
-            .option("app", "a", :required, "The ID or NAME of the application")
-            .option("json", "j", :none, "Output in JSON format")
-            .argument("args", ACON::Input::Argument::Mode[:optional, :is_array], "TYPE=QUANTITY[:SIZE] pairs (e.g. web=2:Standard-2X worker=1)")
-            .help("Scale process types. With no arguments, shows current formation.\n\nExamples:\n  ps:scale -a myapp web=2\n  ps:scale -a myapp web=2:Standard-2X worker=1")
+            .description(t("commands.ps.scale.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .argument("args", ACON::Input::Argument::Mode[:optional, :is_array], t("commands.ps.scale.arguments.args"))
+            .help(t("commands.ps.scale.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -131,7 +131,7 @@ module Build
           scale_args = input.argument("args", type: Array(String))
 
           if app_name_or_id.blank?
-            output.puts("<error>Missing required option --app</error>")
+            output.puts("<error>#{t("runtime.errors.missing_app_option")}</error>")
             return ACON::Command::Status::FAILURE
           end
 
@@ -143,13 +143,13 @@ module Build
           scale_args.each do |arg|
             type_part, _, rest = arg.partition('=')
             if rest.empty?
-              output.puts("<error>Invalid argument '#{arg}'. Use TYPE=QUANTITY[:SIZE]</error>")
+              output.puts("<error>#{t("runtime.ps.scale.invalid_arg", arg: arg)}</error>")
               return ACON::Command::Status::FAILURE
             end
             qty_part, _, size_part = rest.partition(':')
             qty = qty_part.to_i?
             unless qty
-              output.puts("<error>Invalid quantity '#{qty_part}' in '#{arg}'</error>")
+              output.puts("<error>#{t("runtime.ps.scale.invalid_quantity", quantity: qty_part, arg: arg)}</error>")
               return ACON::Command::Status::FAILURE
             end
             update = Hash(String, String | Int32).new
@@ -172,12 +172,12 @@ module Build
                 qty = entry["quantity"]?.try(&.as_i?) || next
                 size = entry["size"]?.try(&.as_s?) || ""
                 label = size.empty? ? "#{type}=#{qty}" : "#{type}=#{qty}:#{size}"
-                output.puts "Scaling #{label}... done"
+                output.puts t("runtime.ps.scale.done", label: label)
               end
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to scale: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.ps.scale.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -201,7 +201,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to get formation: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.ps.scale.failed_get_formation", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -240,13 +240,13 @@ module Build
         protected def configure : Nil
           self
             .name("ps:exec")
-            .description("Execute a command in a running dyno")
-            .option("app", "a", :required, "The ID or NAME of the application")
-            .option("dyno", "d", :required, "The NAME of the dyno (e.g. web.1) to exec into")
-            .option("status", "s", :none, "Show exec readiness for all dynos")
-            .argument("CMD", ACON::Input::Argument::Mode[:optional, :is_array], "Command to run inside the dyno")
-            .help("Execute a command in a running dyno.\n\nWith no CMD, opens an interactive bash session.\nWith CMD, executes the command and returns output.\nWith --status, shows exec readiness per dyno.")
-            .usage("ps:exec -a <app> -d <dyno> -- ls -l")
+            .description(t("commands.ps.exec.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("dyno", "d", :required, t("commands.ps.exec.options.dyno"))
+            .option("status", "s", :none, t("commands.ps.exec.options.status"))
+            .argument("CMD", ACON::Input::Argument::Mode[:optional, :is_array], t("commands.ps.exec.arguments.cmd"))
+            .help(t("commands.ps.exec.help"))
+            .usage(t("runtime.ps.exec.usage"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -259,7 +259,7 @@ module Build
           dyno_name = input.option("dyno", type: String)
 
           if app_name_or_id.blank? || dyno_name.blank?
-            output.puts("<error>   Missing required options --app and/or --dyno</error>")
+            output.puts("<error>   #{t("runtime.errors.missing_app_or_dyno")}</error>")
             return ACON::Command::Status::FAILURE
           end
 
@@ -271,12 +271,12 @@ module Build
           end
 
           if command_parts.empty?
-            output.puts("<error>   No command specified and stdin is not a TTY</error>")
+            output.puts("<error>   #{t("runtime.ps.exec.no_command_non_tty")}</error>")
             return ACON::Command::Status::FAILURE
           end
 
           # Non-interactive: existing HTTP POST path
-          spinner = dots_spinner("Executing '#{command_parts.join(" ")}' on #{dyno_name}")
+          spinner = dots_spinner(t("runtime.ps.exec.executing", command: command_parts.join(" "), dyno: dyno_name))
           begin
             response_body = self.exec_dyno(app_name_or_id, dyno_name, command_parts)
             spinner.success
@@ -291,17 +291,17 @@ module Build
 
         private def exec_status(app_id : String, output : ACON::Output::Interface) : ACON::Command::Status
           if app_id.blank?
-            output.puts("<error>   Missing required option --app</error>")
+            output.puts("<error>   #{t("runtime.errors.missing_app_option")}</error>")
             return ACON::Command::Status::FAILURE
           end
           dynos = api.list_dynos(app_id)
           unless dynos
-            output.puts("<info>   No processes found</info>")
+            output.puts("<info>   #{t("runtime.ps.no_processes")}</info>")
             return ACON::Command::Status::SUCCESS
           end
           dynos.each do |dyno|
             dyno.processes.each do |process|
-              status = process.status == "Running" ? "ready".colorize.green : "not ready".colorize.red
+              status = process.status == "Running" ? t("runtime.status.ready").colorize.green : t("runtime.status.not_ready").colorize.red
               output.puts "#{dyno._type}.#{process.index}: #{status}"
             end
           end
@@ -311,11 +311,11 @@ module Build
         private def interactive_exec(app_id : String, dyno : String, command : String, output : ACON::Output::Interface) : ACON::Command::Status
           user_token = self.token
           unless user_token
-            output.puts("<error>   Not logged in</error>")
+            output.puts("<error>   #{t("runtime.errors.not_logged_in_short")}</error>")
             return ACON::Command::Status::FAILURE
           end
 
-          spinner = dots_spinner("Connecting to #{dyno}")
+          spinner = dots_spinner(t("runtime.ps.exec.connecting", dyno: dyno))
 
           host = Build.api_host
           scheme = Build.api_host_scheme == "https" ? "wss" : "ws"
@@ -363,7 +363,7 @@ module Build
                     STDOUT.flush
                   end
                 when "error"
-                  STDERR.puts("\r\n#{message["message"]?.try(&.as_s) || "Unknown error"}")
+                  STDERR.puts("\r\n#{message["message"]?.try(&.as_s) || t("runtime.errors.unknown")}")
                   select
                   when done.send(nil)
                   else

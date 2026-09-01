@@ -16,21 +16,11 @@ module Build
         protected def configure : Nil
           self
             .name("apps:list")
-            .description("List the apps you have access to.")
-            .option("team", "t", :optional, "Team.")
+            .description(t("commands.apps.list.description"))
+            .option("team", "t", :optional, t("commands.common.options.team"))
             # Allow --json to be passed in
-            .option("json", "j", :none, "Output in JSON format.")
-            .help(<<-HELP
-            List apps you have access to. By default, only personal apps are shown.
-            To see apps owned by a team, use the -t flag. Use `bld teams` to see
-            your available teams and their apps.
-
-            Examples:
-              $ bld apps                  # personal apps only
-              $ bld apps -t my-team       # apps for a specific team
-              $ bld teams                 # list teams to find team apps
-            HELP
-            )
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.apps.list.help"))
             .aliases(["apps"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -40,9 +30,9 @@ module Build
             output.puts apps.to_json
           else
             if team_id
-              output.puts "Apps for team #{team_id}:"
+              output.puts t("runtime.apps.list.team_header", team: team_id)
             else
-              output.puts "Personal Apps you have access to:"
+              output.puts t("runtime.apps.list.personal_header")
             end
             output.puts ""
             apps.each do |app|
@@ -50,8 +40,8 @@ module Build
             end
             if !team_id
               output.puts ""
-              output.puts "To see apps owned by a team, run: bld apps -t <team>"
-              output.puts "To list available teams, run: bld teams"
+              output.puts t("runtime.apps.list.team_hint")
+              output.puts t("runtime.apps.list.teams_hint")
             end
           end
           return ACON::Command::Status::SUCCESS
@@ -63,15 +53,15 @@ module Build
         protected def configure : Nil
           self
             .name("apps:info")
-            .description("Show the details of a specific application.")
-            .argument("app", :optional, "The ID or NAME of the app to show.")
-            .option("app", "a", :optional, "The app")
-            .option("json", "j", :none, "Output in JSON format.")
+            .description(t("commands.apps.info.description"))
+            .argument("app", :optional, t("commands.common.arguments.app"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .option("json", "j", :none, t("commands.common.options.json"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.argument("app", type: String | Nil) || input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app ID or NAME."
+            output.puts t("runtime.errors.must_specify_app_id_or_name")
             return ACON::Command::Status::FAILURE
           end
           app = api.app(app_input)
@@ -79,10 +69,10 @@ module Build
             output.puts app.to_json
           else
             output.puts "=== #{app.name}"
-            output.puts "Git URL:    #{app.git_url}" if app.git_url
-            output.puts "Region:     #{app.region}"
-            output.puts "Stack:      #{app.stack || app.build_stack}"
-            output.puts "Web URL:    #{app.web_url}" if app.web_url
+            output.puts t("runtime.labels.git_url", value: app.git_url) if app.git_url
+            output.puts t("runtime.labels.region", value: app.region)
+            output.puts t("runtime.labels.stack", value: app.stack || app.build_stack)
+            output.puts t("runtime.labels.web_url", value: app.web_url) if app.web_url
           end
           return ACON::Command::Status::SUCCESS
         end
@@ -93,12 +83,12 @@ module Build
         protected def configure : Nil
           self
             .name("apps:create")
-            .description("Create a new application.")
-            .argument("name", :required, "The name of the app to create.")
-            .option("team", "t", :optional, "The team to create the app in.")
-            .option("region", "r", :optional, "The region (default: #{self.default_region}).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Create a new application.")
+            .description(t("commands.apps.create.description"))
+            .argument("name", :required, t("commands.apps.create.arguments.name"))
+            .option("team", "t", :optional, t("commands.apps.create.options.team"))
+            .option("region", "r", :optional, t("commands.common.options.region", region: self.default_region))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.apps.create.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           name = input.argument("name", type: String)
@@ -109,12 +99,12 @@ module Build
           if input.option("json", type: Bool)
             output.puts app.to_json
           else
-            output.puts "App created:"
+            output.puts t("runtime.apps.create.created")
             output.puts ""
-            output.puts "  Name:    #{app.name}"
-            output.puts "  ID:      #{app.id}"
-            output.puts "  Git URL: #{app.git_url}" if app.git_url
-            output.puts "  Web URL: #{app.web_url}" if app.web_url
+            output.puts t("runtime.labels.indented_name", value: app.name)
+            output.puts t("runtime.labels.indented_id", value: app.id)
+            output.puts t("runtime.labels.indented_git_url", value: app.git_url) if app.git_url
+            output.puts t("runtime.labels.indented_web_url", value: app.web_url) if app.web_url
           end
           return ACON::Command::Status::SUCCESS
         end
@@ -124,24 +114,16 @@ module Build
         protected def configure : Nil
           self
             .name("apps:stacks")
-            .description("Show the stack for an app.")
-            .argument("app", :optional, "The ID or NAME of the app.")
-            .option("app", "a", :optional, "The app.")
-            .help(<<-HELP
-            Show the current stack for an application. The stack determines the
-            base operating system image used for builds and dynos.
-
-            Example:
-              $ bld apps:stacks -a my-app
-              Stack: heroku-24
-            HELP
-            )
+            .description(t("commands.apps.stacks.description"))
+            .argument("app", :optional, t("commands.common.arguments.app"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .help(t("commands.apps.stacks.help"))
             .aliases(["stack"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.argument("app", type: String | Nil) || input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app ID or NAME."
+            output.puts t("runtime.errors.must_specify_app_id_or_name")
             return ACON::Command::Status::FAILURE
           end
           app = api.app(app_input)
@@ -155,32 +137,21 @@ module Build
         protected def configure : Nil
           self
             .name("apps:stacks:set")
-            .description("Set the stack for an app.")
-            .argument("stack", :required, "The stack to set (e.g. heroku-22, heroku-24).")
-            .option("app", "a", :optional, "The app.")
-            .help(<<-HELP
-            Set the build stack for an application. This determines the base
-            operating system image used for the next build. The change takes
-            effect on the next deployment.
-
-            Common stacks: heroku-20, heroku-22, heroku-24
-
-            Example:
-              $ bld apps:stacks:set heroku-24 -a my-app
-              Stack set to heroku-24 for my-app.
-            HELP
-            )
+            .description(t("commands.apps.stacks_set.description"))
+            .argument("stack", :required, t("commands.apps.stacks_set.arguments.stack"))
+            .option("app", "a", :optional, t("commands.common.options.app"))
+            .help(t("commands.apps.stacks_set.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_input = input.option("app", type: String | Nil)
           if app_input.nil?
-            output.puts "You must specify an app with -a or --app."
+            output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
           stack = input.argument("stack", type: String)
           req = UpdateAppRequest.new(build_stack: stack)
           app = api.update_app(app_input, req)
-          output.puts "Stack set to #{app.stack} for #{app.name}."
+          output.puts t("runtime.apps.stacks_set.success", stack: app.stack, app: app.name)
           return ACON::Command::Status::SUCCESS
         end
       end

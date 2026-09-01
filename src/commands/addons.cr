@@ -6,11 +6,11 @@ module Build
         protected def configure : Nil
           self
             .name("addons")
-            .description("List addons for an app or team.")
-            .option("app", "a", :optional, "App name or ID.")
-            .option("team", "t", :optional, "Team name or ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("List all addons provisioned for an app or team.")
+            .description(t("commands.addons.list.description"))
+            .option("app", "a", :optional, t("commands.common.options.app_id_or_name"))
+            .option("team", "t", :optional, t("commands.common.options.team"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.list.help"))
             .aliases(["addons:list"])
         end
 
@@ -20,7 +20,7 @@ module Build
           json_output = input.option("json", type: Bool)
 
           if (app_name.nil? || app_name.blank?) && (team_name.nil? || team_name.blank?)
-            output.puts "<error>Specify --app or --team</error>"
+            output.puts "<error>#{t("runtime.errors.specify_app_or_team")}</error>"
             return ACON::Command::Status::FAILURE
           end
 
@@ -38,7 +38,7 @@ module Build
               output.puts addons.to_json
             else
               if addons.empty?
-                output.puts "No addons for #{label}"
+                output.puts t("runtime.addons.list.none", label: label)
               else
                 addons.each do |addon|
                   plan_name = addon.plan.name
@@ -50,7 +50,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to list addons: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.list.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -74,9 +74,9 @@ module Build
         protected def configure : Nil
           self
             .name("addons:services")
-            .description("List available addon services.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("List all available addon services from the catalog.")
+            .description(t("commands.addons.services.description"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.services.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -89,7 +89,7 @@ module Build
               output.puts data
             else
               parsed = JSON.parse(data)
-              headers = {"slug", "name", "summary", "state"}
+              headers = {t("runtime.addons.headers.slug"), t("runtime.addons.headers.name"), t("runtime.addons.headers.summary"), t("runtime.addons.headers.state")}
               rows = parsed.as_a.map do |svc|
                 {svc["name"].as_s, svc["human_name"]?.try(&.as_s?) || svc["name"].as_s, svc["summary"]?.try(&.as_s?) || "", svc["state"]?.try(&.as_s?) || ""}
               end
@@ -97,7 +97,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to list addon services: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.services.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -121,10 +121,10 @@ module Build
         protected def configure : Nil
           self
             .name("addons:plans")
-            .description("List plans for an addon service.")
-            .argument("service", :required, "Addon service name (e.g. bld-postgres).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("List available plans for an addon service.")
+            .description(t("commands.addons.plans.description"))
+            .argument("service", :required, t("commands.addons.plans.arguments.service"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.plans.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -138,9 +138,9 @@ module Build
               output.puts data
             else
               parsed = JSON.parse(data)
-              headers = {"default", "slug", "name", "price"}
+              headers = {t("runtime.addons.headers.default"), t("runtime.addons.headers.slug"), t("runtime.addons.headers.name"), t("runtime.addons.headers.price")}
               rows = parsed.as_a.map do |plan|
-                is_default = plan["default"]?.try(&.as_bool?) ? "default" : ""
+                is_default = plan["default"]?.try(&.as_bool?) ? t("runtime.addons.default_marker") : ""
                 slug = "#{service_name}:#{plan["name"].as_s}"
                 human = plan["human_name"]?.try(&.as_s?) || plan["name"].as_s
                 cents = plan["monthly_price"]?.try(&.["cents"]?.try(&.as_i?))
@@ -152,7 +152,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to list plans: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.plans.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -176,15 +176,15 @@ module Build
         protected def configure : Nil
           self
             .name("addons:create")
-            .description("Create an addon for an app.")
-            .argument("plan", :required, "Addon service and plan (e.g. bld-postgres:essential-0).")
-            .option("app", "a", :required, "App name or ID.")
-            .option("name", nil, :optional, "Custom name for the addon.")
-            .option("human-name", nil, :optional, "Display name for the addon.")
-            .option("description", "d", :optional, "Description for the addon.")
-            .option("config", "c", ACON::Input::Option::Value[:optional, :is_array], "Config key=value (repeatable).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Provision a new addon for an app.")
+            .description(t("commands.addons.create.description"))
+            .argument("plan", :required, t("commands.addons.create.arguments.plan"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("name", nil, :optional, t("commands.addons.create.options.name"))
+            .option("human-name", nil, :optional, t("commands.addons.create.options.human_name"))
+            .option("description", "d", :optional, t("commands.addons.create.options.description"))
+            .option("config", "c", ACON::Input::Option::Value[:optional, :is_array], t("commands.addons.create.options.config"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.create.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -215,10 +215,10 @@ module Build
               output.puts addon.to_json
             else
               name = addon.name || addon.id
-              output.puts "Creating #{plan} on #{app_name}... done, #{name} (#{addon.state})"
+              output.puts t("runtime.addons.create.done", plan: plan, app: app_name, name: name, state: addon.state)
               if config_vars = addon.config_vars
                 unless config_vars.empty?
-                  output.puts "Config vars: #{config_vars.join(", ")}"
+                  output.puts t("runtime.labels.config_vars_inline", vars: config_vars.join(", "))
                 end
               end
             end
@@ -232,17 +232,17 @@ module Build
                 output.puts "<error>#{msg}</error>"
                 if plans = parsed["available_plans"]?
                   plan_list = plans.as_a.map(&.as_s).join(", ")
-                  output.puts "Available plans: #{plan_list}"
+                  output.puts t("runtime.addons.create.available_plans", plans: plan_list)
                   service_name = plan.split(":").first?
-                  output.puts "Run 'bld addons:plans #{service_name}' to see plan details." if service_name
+                  output.puts t("runtime.addons.create.plans_hint", service: service_name) if service_name
                 elsif hint = parsed["hint"]?.try(&.as_s?)
-                  output.puts "Run 'bld addons:services' to see available services."
+                  output.puts t("runtime.addons.create.services_hint")
                 end
               rescue JSON::ParseException
-                output.puts "<error>Failed to create addon: #{e.message}</error>"
+                output.puts "<error>#{t("runtime.addons.create.failed", error: e.message)}</error>"
               end
             else
-              output.puts "<error>Failed to create addon</error>"
+              output.puts "<error>#{t("runtime.addons.create.failed_no_error")}</error>"
             end
             return ACON::Command::Status::FAILURE
           end
@@ -254,10 +254,10 @@ module Build
         protected def configure : Nil
           self
             .name("addons:info")
-            .description("Show info about an addon.")
-            .argument("addon", :required, "Addon name or ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Show detailed information about an addon, including attachments.")
+            .description(t("commands.addons.info.description"))
+            .argument("addon", :required, t("commands.common.arguments.addon"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.info.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -275,34 +275,34 @@ module Build
               name = parsed["name"]?.try(&.as_s?) || parsed["id"].as_s
               output.puts "=== #{name}"
               if human_name = parsed["human_name"]?.try(&.as_s?)
-                output.puts "Display Name: #{human_name}" unless human_name.empty?
+                output.puts t("runtime.labels.display_name", value: human_name) unless human_name.empty?
               end
               if desc = parsed["description"]?.try(&.as_s?)
-                output.puts "Description:  #{desc}" unless desc.empty?
+                output.puts t("runtime.labels.description", value: desc) unless desc.empty?
               end
-              output.puts "Plan:         #{parsed["plan"]["name"]}"
-              output.puts "Service:      #{parsed["addon_service"]["name"]}"
-              output.puts "App:          #{parsed["app"]["name"]}"
-              output.puts "State:        #{parsed["state"]}"
+              output.puts t("runtime.labels.plan", value: parsed["plan"]["name"])
+              output.puts t("runtime.labels.service", value: parsed["addon_service"]["name"])
+              output.puts t("runtime.labels.app_padded", value: parsed["app"]["name"])
+              output.puts t("runtime.labels.state", value: parsed["state"])
               if cvs = parsed["config_vars"]?
                 vars = cvs.as_a.map(&.as_s)
-                output.puts "Config Vars:  #{vars.join(", ")}" unless vars.empty?
+                output.puts t("runtime.labels.config_vars", value: vars.join(", ")) unless vars.empty?
               end
               if url = parsed["web_url"]?.try(&.as_s?)
-                output.puts "Web URL:      #{url}" unless url.empty?
+                output.puts t("runtime.labels.web_url_wide", value: url) unless url.empty?
               end
               if price = parsed["billed_price"]?
                 cents = price["cents"]?.try(&.as_i?)
                 unit = price["unit"]?.try(&.as_s?)
                 if cents && unit
-                  output.puts "Price:        $#{"%.2f" % (cents / 100.0)}/#{unit}"
+                  output.puts t("runtime.labels.price", value: "$#{"%.2f" % (cents / 100.0)}/#{unit}")
                 end
               end
               if attachments = parsed["attachments"]?
                 atts = attachments.as_a
                 unless atts.empty?
                   output.puts ""
-                  output.puts "=== Attachments"
+                  output.puts t("runtime.addons.info.attachments_title")
                   atts.each do |att|
                     att_name = att["name"].as_s
                     app_name = att["app"]["name"].as_s
@@ -314,7 +314,7 @@ module Build
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to get addon info: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.info.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -338,11 +338,11 @@ module Build
         protected def configure : Nil
           self
             .name("addons:destroy")
-            .description("Destroy an addon.")
-            .argument("addon", :required, "Addon name or ID.")
-            .option("app", "a", :required, "App name or ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Destroy an addon (deprovisions and removes from all attached apps).")
+            .description(t("commands.addons.destroy.description"))
+            .argument("addon", :required, t("commands.common.arguments.addon"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.destroy.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -359,11 +359,11 @@ module Build
               output.puts addon.to_json
             else
               name = addon.name || addon.id
-              output.puts "Destroying #{name} on #{app_name}... done"
+              output.puts t("runtime.addons.destroy.done", name: name, app: app_name)
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to destroy addon: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.destroy.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -374,12 +374,12 @@ module Build
         protected def configure : Nil
           self
             .name("addons:attach")
-            .description("Attach an addon to an app.")
-            .argument("addon", :required, "Addon name or ID.")
-            .option("app", "a", :required, "App name or ID to attach to.")
-            .option("as", nil, :optional, "Attachment name (e.g. DATABASE_RED).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Attach an existing addon to an app.")
+            .description(t("commands.addons.attach.description"))
+            .argument("addon", :required, t("commands.common.arguments.addon"))
+            .option("app", "a", :required, t("commands.addons.attach.options.app"))
+            .option("as", nil, :optional, t("commands.addons.attach.options.as"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.attach.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -402,11 +402,11 @@ module Build
             if json_output
               output.puts attachment.to_json
             else
-              output.puts "Attaching #{addon_id} as #{attachment.name} to #{app_name}... done"
+              output.puts t("runtime.addons.attach.done", addon: addon_id, attachment: attachment.name, app: app_name)
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to attach addon: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.attach.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -417,10 +417,10 @@ module Build
         protected def configure : Nil
           self
             .name("addons:detach")
-            .description("Detach an addon from an app.")
-            .argument("attachment", :required, "Addon attachment ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Detach an addon from an app.")
+            .description(t("commands.addons.detach.description"))
+            .argument("attachment", :required, t("commands.addons.detach.arguments.attachment"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.addons.detach.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -435,11 +435,11 @@ module Build
             if json_output
               output.puts attachment.to_json
             else
-              output.puts "Detaching #{attachment.name}... done"
+              output.puts t("runtime.addons.detach.done", attachment: attachment.name)
             end
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to detach addon: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.addons.detach.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end

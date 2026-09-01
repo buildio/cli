@@ -11,9 +11,9 @@ module Build
         protected def configure : Nil
           self
             .name("teams:list")
-            .description("List the teams you are a member of")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Teams include teams that you are a member of, and teams that you own.")
+            .description(t("commands.teams.list.description"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.teams.list.help"))
             .aliases(["teams"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -21,7 +21,7 @@ module Build
           if input.option("json", type: Bool)
             output.puts teams.to_json
           else
-            output.puts "Teams you have access to:"
+            output.puts t("runtime.teams.list.header")
             output.puts ""
             teams.each do |team|
               output.puts "  #{team.name} (#{team.id})"
@@ -36,23 +36,23 @@ module Build
         protected def configure : Nil
           self
             .name("teams:info")
-            .description("Get information about a team")
-            .argument("team", :optional, "The team ID or name")
-            .option("team", "t", :optional, "The team.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Get information about a team.")
+            .description(t("commands.teams.info.description"))
+            .argument("team", :optional, t("commands.common.arguments.team"))
+            .option("team", "t", :optional, t("commands.common.options.team"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.teams.info.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           team_input = input.argument("team", type: String | Nil) || input.option("team", type: String | Nil)
           if team_input.nil?
-            output.puts "You must specify a team ID or name."
+            output.puts t("runtime.errors.must_specify_team")
             return ACON::Command::Status::FAILURE
           end
           team = api.team(team_input)
           if input.option("json", type: Bool)
             output.puts team.to_json
           else
-            output.puts "Team: #{team.name} (#{team.id})"
+            output.puts t("runtime.teams.info.title", name: team.name, id: team.id)
             # output.puts "  Owner: #{team.owner}"
             # output.puts "  Members:"
             # team.members.each do |member|

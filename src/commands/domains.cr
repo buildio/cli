@@ -10,10 +10,10 @@ module Build
         protected def configure : Nil
           self
             .name("domains")
-            .description("List all domains for an app.")
-            .option("app", "a", :required, "App name or ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("List all domains (default domain + custom domains) for an app.")
+            .description(t("commands.domains.list.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.domains.list.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -33,14 +33,14 @@ module Build
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to list domains: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.list.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
         private def display_domains(output : ACON::Output::Interface, domains : Array(Build::Domain))
           if domains.empty?
-            output.puts "No domains found"
+            output.puts t("runtime.domains.list.none")
             return
           end
           
@@ -52,7 +52,7 @@ module Build
           
           if !platform_domains.empty?
             gray_equals = "===".colorize(:dark_gray)
-            title = "#{app_name} Build.io Domain".colorize.bold
+            title = Build.t("runtime.domains.list.platform_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
             platform_domains.each do |domain|
@@ -63,19 +63,20 @@ module Build
           
           if !custom_domains.empty?
             gray_equals = "===".colorize(:dark_gray)
-            title = "#{app_name} Custom Domains".colorize.bold
+            title = Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
             
             # Calculate column widths
             max_domain_width = custom_domains.map { |d| d.hostname.to_s.size }.max
-            max_domain_width = [max_domain_width, "Domain Name".size].max
+            domain_name_header = Build.t("runtime.domains.headers.domain_name")
+            max_domain_width = [max_domain_width, domain_name_header.size].max
             
             # Print header - bold white
-            header = " Domain Name".ljust(max_domain_width + 2)
-            header += "DNS Record Type".ljust(17)
-            header += "DNS Target".ljust(55)
-            header += "SNI Endpoint"
+            header = " #{domain_name_header}".ljust(max_domain_width + 2)
+            header += Build.t("runtime.domains.headers.dns_record_type").ljust(17)
+            header += Build.t("runtime.domains.headers.dns_target").ljust(55)
+            header += Build.t("runtime.domains.headers.sni_endpoint")
             output.puts header.colorize.bold
             
             # Print separator line - bold white
@@ -105,10 +106,10 @@ module Build
             end
           else
             gray_equals = "===".colorize(:dark_gray)
-            title = "#{app_name} Custom Domains".colorize.bold
+            title = Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
-            output.puts "No custom domains. Add one with: bld domains:add <hostname> -a <app-name>"
+            output.puts t("runtime.domains.list.no_custom")
           end
         end
       end
@@ -118,13 +119,13 @@ module Build
         protected def configure : Nil
           self
             .name("domains:add")
-            .description("Add a domain to an app.")
-            .argument("hostname", :required, "The domain name to add.")
-            .option("app", "a", :required, "App name or ID.")
-            .option("cert", "c", :optional, "The name of the SSL cert to use for this domain.")
-            .option("wait", "w", :none, "Wait for domain to be active.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Add a custom domain to an app.")
+            .description(t("commands.domains.add.description"))
+            .argument("hostname", :required, t("commands.domains.common.arguments.hostname_add"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("cert", "c", :optional, t("commands.domains.common.options.cert"))
+            .option("wait", "w", :none, t("commands.domains.add.options.wait"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.domains.add.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -149,13 +150,13 @@ module Build
             if json_output
               output.puts result.to_json
             else
-              output.puts "<info>Added domain #{hostname} to #{app_name}</info>"
+              output.puts "<info>#{t("runtime.domains.add.added", hostname: hostname, app: app_name)}</info>"
               display_domain_details(output, result)
             end
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to add domain: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.add.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -166,10 +167,10 @@ module Build
         protected def configure : Nil
           self
             .name("domains:remove")
-            .description("Remove a domain from an app.")
-            .argument("hostname", :required, "The domain name to remove.")
-            .option("app", "a", :required, "App name or ID.")
-            .help("Remove a custom domain from an app.")
+            .description(t("commands.domains.remove.description"))
+            .argument("hostname", :required, t("commands.domains.common.arguments.hostname_remove"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .help(t("commands.domains.remove.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -185,16 +186,16 @@ module Build
             domain = domains.find { |d| d.hostname == hostname }
             
             if domain.nil?
-              output.puts "<error>Domain #{hostname} not found for app #{app_name}</error>"
+              output.puts "<error>#{t("runtime.domains.not_found", hostname: hostname, app: app_name)}</error>"
               return ACON::Command::Status::FAILURE
             end
             
             api_instance.remove_domain(app_name, domain.id.to_s)
-            output.puts "<info>Removed domain #{hostname} from #{app_name}</info>"
+            output.puts "<info>#{t("runtime.domains.remove.removed", hostname: hostname, app: app_name)}</info>"
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to remove domain: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.remove.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -205,9 +206,9 @@ module Build
         protected def configure : Nil
           self
             .name("domains:clear")
-            .description("Clear all custom domains from an app.")
-            .option("app", "a", :required, "App name or ID.")
-            .help("Remove all custom domains from an app. Platform domains cannot be removed.")
+            .description(t("commands.domains.clear.description"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .help(t("commands.domains.clear.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -224,21 +225,21 @@ module Build
             custom_domains = domains.select { |d| d.kind != "platform" }
             
             if custom_domains.empty?
-              output.puts "<info>No custom domains to clear for #{app_name}</info>"
+              output.puts "<info>#{t("runtime.domains.clear.none", app: app_name)}</info>"
               return ACON::Command::Status::SUCCESS
             end
             
             # Delete each custom domain
             custom_domains.each do |domain|
               api_instance.remove_domain(app_name, domain.id.to_s)
-              output.puts "<info>Removed domain #{domain.hostname}</info>"
+              output.puts "<info>#{t("runtime.domains.clear.removed", hostname: domain.hostname)}</info>"
             end
             
-            output.puts "<info>Cleared all custom domains from #{app_name}</info>"
+            output.puts "<info>#{t("runtime.domains.clear.cleared", app: app_name)}</info>"
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to clear domains: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.clear.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -249,11 +250,11 @@ module Build
         protected def configure : Nil
           self
             .name("domains:info")
-            .description("Show detailed information about a domain.")
-            .argument("hostname", :required, "The domain name.")
-            .option("app", "a", :required, "App name or ID.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Display detailed information about a specific domain.")
+            .description(t("commands.domains.info.description"))
+            .argument("hostname", :required, t("commands.domains.common.arguments.hostname"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.domains.info.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -270,7 +271,7 @@ module Build
             domain = domains.find { |d| d.hostname == hostname }
             
             if domain.nil?
-              output.puts "<error>Domain #{hostname} not found for app #{app_name}</error>"
+              output.puts "<error>#{t("runtime.domains.not_found", hostname: hostname, app: app_name)}</error>"
               return ACON::Command::Status::FAILURE
             end
             
@@ -285,36 +286,36 @@ module Build
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to get domain info: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.info.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
         private def display_domain_details(output : ACON::Output::Interface, domain : Build::Domain)
           output.puts "=== <info>#{domain.hostname}</info>"
-          output.puts "ID:          #{domain.id}"
-          output.puts "Kind:        #{domain.kind}"
-          output.puts "Status:      #{domain.status}"
+          output.puts Build.t("runtime.labels.id", value: domain.id)
+          output.puts Build.t("runtime.labels.kind", value: domain.kind)
+          output.puts Build.t("runtime.labels.status", value: domain.status)
           
           if domain.cname
-            output.puts "CNAME:       #{domain.cname}"
+            output.puts Build.t("runtime.labels.cname", value: domain.cname)
           end
           
           if domain.acm_status
-            output.puts "ACM Status:  #{domain.acm_status}"
+            output.puts Build.t("runtime.labels.acm_status", value: domain.acm_status)
             if reason = domain.acm_status_reason
               if !reason.to_s.empty?
-                output.puts "ACM Reason:  #{reason}"
+                output.puts Build.t("runtime.labels.acm_reason", value: reason)
               end
             end
           end
           
           if sni = domain.sni_endpoint
-            output.puts "SNI Endpoint: #{sni.name}" if sni.responds_to?(:name)
+            output.puts Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
           end
           
-          output.puts "Created:     #{domain.created_at}"
-          output.puts "Updated:     #{domain.updated_at}"
+          output.puts Build.t("runtime.labels.created", value: domain.created_at)
+          output.puts Build.t("runtime.labels.updated", value: domain.updated_at)
         end
       end
 
@@ -323,12 +324,12 @@ module Build
         protected def configure : Nil
           self
             .name("domains:update")
-            .description("Update a domain's SSL certificate.")
-            .argument("hostname", :required, "The domain name.")
-            .option("app", "a", :required, "App name or ID.")
-            .option("cert", "c", :required, "The name of the SSL cert to use for this domain.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Update a domain's SSL certificate configuration.")
+            .description(t("commands.domains.update.description"))
+            .argument("hostname", :required, t("commands.domains.common.arguments.hostname"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .option("cert", "c", :required, t("commands.domains.common.options.cert"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.domains.update.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -346,7 +347,7 @@ module Build
             domain = domains.find { |d| d.hostname == hostname }
             
             if domain.nil?
-              output.puts "<error>Domain #{hostname} not found for app #{app_name}</error>"
+              output.puts "<error>#{t("runtime.domains.not_found", hostname: hostname, app: app_name)}</error>"
               return ACON::Command::Status::FAILURE
             end
             
@@ -357,13 +358,13 @@ module Build
             if json_output
               output.puts result.to_json
             else
-              output.puts "<info>Updated domain #{hostname} for #{app_name}</info>"
+              output.puts "<info>#{t("runtime.domains.update.updated", hostname: hostname, app: app_name)}</info>"
               display_domain_details(output, result)
             end
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to update domain: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.update.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -374,10 +375,10 @@ module Build
         protected def configure : Nil
           self
             .name("domains:wait")
-            .description("Wait for a domain to become active.")
-            .argument("hostname", :required, "The domain name.")
-            .option("app", "a", :required, "App name or ID.")
-            .help("Wait for a domain to finish provisioning and become active.")
+            .description(t("commands.domains.wait.description"))
+            .argument("hostname", :required, t("commands.domains.common.arguments.hostname"))
+            .option("app", "a", :required, t("commands.common.options.app_id_or_name"))
+            .help(t("commands.domains.wait.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -393,16 +394,16 @@ module Build
             domain = domains.find { |d| d.hostname == hostname }
             
             if domain.nil?
-              output.puts "<error>Domain #{hostname} not found for app #{app_name}</error>"
+              output.puts "<error>#{t("runtime.domains.not_found", hostname: hostname, app: app_name)}</error>"
               return ACON::Command::Status::FAILURE
             end
             
             wait_for_domain(output, app_name, domain.id.to_s)
-            output.puts "<info>Domain #{hostname} is active</info>"
+            output.puts "<info>#{t("runtime.domains.wait.active", hostname: hostname)}</info>"
             
             return ACON::Command::Status::SUCCESS
           rescue e : Build::ApiError
-            output.puts "<error>Failed to wait for domain: #{e.message}</error>"
+            output.puts "<error>#{t("runtime.domains.wait.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
@@ -412,7 +413,7 @@ module Build
           max_attempts = 60  # Wait up to 5 minutes
           attempt = 0
           
-          output.puts "<info>Waiting for domain to become active...</info>"
+          output.puts "<info>#{Build.t("runtime.domains.wait.waiting")}</info>"
           
           loop do
             attempt += 1
@@ -423,16 +424,16 @@ module Build
               if domain.status == "succeeded"
                 return
               elsif domain.status == "failed"
-                raise "Domain activation failed"
+                raise Build.t("runtime.domains.wait.activation_failed")
               end
               
               if attempt >= max_attempts
-                raise "Timeout waiting for domain activation"
+                raise Build.t("runtime.domains.wait.timeout")
               end
               
               sleep 5.seconds
             rescue e : Build::ApiError
-              raise "Failed to check domain status: #{e.message}"
+              raise Build.t("runtime.domains.wait.check_failed", error: e.message)
             end
           end
         end
@@ -442,29 +443,29 @@ module Build
       module SharedHelpers
         def display_domain_details(output : ACON::Output::Interface, domain : Build::Domain)
           output.puts "=== <info>#{domain.hostname}</info>"
-          output.puts "ID:          #{domain.id}"
-          output.puts "Kind:        #{domain.kind}"
-          output.puts "Status:      #{domain.status}"
+          output.puts Build.t("runtime.labels.id", value: domain.id)
+          output.puts Build.t("runtime.labels.kind", value: domain.kind)
+          output.puts Build.t("runtime.labels.status", value: domain.status)
           
           if domain.cname
-            output.puts "CNAME:       #{domain.cname}"
+            output.puts Build.t("runtime.labels.cname", value: domain.cname)
           end
           
           if domain.acm_status
-            output.puts "ACM Status:  #{domain.acm_status}"
+            output.puts Build.t("runtime.labels.acm_status", value: domain.acm_status)
             if reason = domain.acm_status_reason
               if !reason.to_s.empty?
-                output.puts "ACM Reason:  #{reason}"
+                output.puts Build.t("runtime.labels.acm_reason", value: reason)
               end
             end
           end
           
           if sni = domain.sni_endpoint
-            output.puts "SNI Endpoint: #{sni.name}" if sni.responds_to?(:name)
+            output.puts Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
           end
           
-          output.puts "Created:     #{domain.created_at}"
-          output.puts "Updated:     #{domain.updated_at}"
+          output.puts Build.t("runtime.labels.created", value: domain.created_at)
+          output.puts Build.t("runtime.labels.updated", value: domain.updated_at)
         end
 
         def wait_for_domain(output : ACON::Output::Interface, app_id : String, domain_id : String)
@@ -472,7 +473,7 @@ module Build
           max_attempts = 60  # Wait up to 5 minutes
           attempt = 0
           
-          output.puts "<info>Waiting for domain to become active...</info>"
+          output.puts "<info>#{Build.t("runtime.domains.wait.waiting")}</info>"
           
           loop do
             attempt += 1
@@ -483,16 +484,16 @@ module Build
               if domain.status == "succeeded"
                 return
               elsif domain.status == "failed"
-                raise "Domain activation failed"
+                raise Build.t("runtime.domains.wait.activation_failed")
               end
               
               if attempt >= max_attempts
-                raise "Timeout waiting for domain activation"
+                raise Build.t("runtime.domains.wait.timeout")
               end
               
               sleep 5.seconds
             rescue e : Build::ApiError
-              raise "Failed to check domain status: #{e.message}"
+              raise Build.t("runtime.domains.wait.check_failed", error: e.message)
             end
           end
         end

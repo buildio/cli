@@ -1,5 +1,9 @@
 require "athena-console"
+require "./i18n"
+require "./display_width"
+require "./console/localized_text_descriptor"
 require "./ext/term_spinner"
+require "./ext/build_client_accept_language"
 require "./utils"
 require "./log_colorizer"
 require "./update_check"
@@ -52,10 +56,10 @@ module Build
     current_scheme = self.api_host_scheme
     sdk_debugging_flag = self.debugging?
     if self.debugging?
-      STDERR.puts "[DEBUG] Setting up global API config with:"
-      STDERR.puts "[DEBUG]   Host: #{current_host}"
-      STDERR.puts "[DEBUG]   Scheme: #{current_scheme}"
-      STDERR.puts "[DEBUG]   SDK Debugging: #{sdk_debugging_flag}"
+      STDERR.puts Build.t("runtime.debug.global_api_config")
+      STDERR.puts Build.t("runtime.debug.host", host: current_host)
+      STDERR.puts Build.t("runtime.debug.scheme", scheme: current_scheme)
+      STDERR.puts Build.t("runtime.debug.sdk_debugging", enabled: sdk_debugging_flag)
     end
     Build.configure do |config|
       config.host       = current_host
@@ -65,11 +69,16 @@ module Build
   end
 end
 
+Build::Locale.init
 Build.setup_global_api_config # Call it once to configure the API client globally
 
 application = ACON::Application.new "Build.io CLI", version: VERSION
+application.definition = Build::Console.default_input_definition
 
 # Register commands using the `#add` method
+application.add Build::Commands::Help.new
+application.add Build::Commands::List.new
+application.add Build::Commands::Completion.new
 application.add Build::Commands::Whoami.new
 application.add Build::Commands::Login.new
 application.add Build::Commands::OidcLogin.new

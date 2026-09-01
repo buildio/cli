@@ -45,6 +45,14 @@ When `BUILD_API_URL` is set, the CLI will direct all API requests to this URL, a
 
 If `BUILD_API_URL` is not set, the CLI defaults to `https://app.build.io`.
 
+## Language selection
+
+`bld` uses `BUILD_LOCALE` when set, then falls back to `LC_ALL`, `LC_MESSAGES`, and `LANG`. Supported values currently normalize to `en` or `ja`; unsupported locales, `C`, and `POSIX` fall back to English.
+
+```bash
+BUILD_LOCALE=ja bld help apps:list
+```
+
 ## Contributors
 
 - [Matthew Chigira](https://github.com/matthewchigira) - creator and maintainer

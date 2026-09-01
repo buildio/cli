@@ -91,6 +91,9 @@ Conventions to follow:
 - `BUILD_API_URL` — override the API base (default `https://app.build.io`).
 - `BUILD_API_KEY` — bearer token, bypasses `~/.netrc`.
 - `BUILD_DEFAULT_REGION` — default `us-east-1`.
+- `BUILD_LOCALE` — override CLI language selection. If unset, locale is detected
+  from `LC_ALL`, `LC_MESSAGES`, then `LANG`; unsupported locales fall back to
+  English.
 - `DEBUG=1` — verbose CLI + SDK logging.
 - `BUILD_NO_UPDATE_CHECK=1` — disable the once-per-day GitHub release check
   that prints an "update available" notice on STDERR. State is piggybacked on

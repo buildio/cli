@@ -5,8 +5,8 @@ module Build
       protected def configure : Nil
         self
           .name("whoami")
-          .description("Display the current logged in user")
-          .help("Build commands run through the CLI use the API with permission level of this user. To see the current user, run this command. To change users, see the login command.")
+          .description(t("commands.whoami.description"))
+          .help(t("commands.whoami.help"))
           .aliases(["me"])
       end
 

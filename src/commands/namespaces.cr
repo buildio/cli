@@ -6,10 +6,10 @@ module Build
         protected def configure : Nil
           self
             .name("namespaces:list")
-            .description("List the namespaces you are a member of")
-            .option("team", "t", :optional, "The team ID or name.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Namespaces include namespaces that you are a member of, and namespaces that you own.")
+            .description(t("commands.namespaces.list.description"))
+            .option("team", "t", :optional, t("commands.common.options.team"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.namespaces.list.help"))
             .aliases(["namespaces"])
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -17,7 +17,7 @@ module Build
           if input.option("json", type: Bool)
             output.puts namespaces.to_json
           else
-            output.puts "Namespaces you have access to:"
+            output.puts t("runtime.namespaces.list.header")
             output.puts ""
             namespaces.each do |namespace|
               output.puts "  #{namespace.name} (#{namespace.id})"
@@ -32,23 +32,23 @@ module Build
         protected def configure : Nil
           self
             .name("namespaces:info")
-            .description("Get information about a namespace")
-            .argument("namespace", :optional, "The namespace ID or name")
-            .option("namespace", "t", :optional, "The namespace.")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Get information about a namespace.")
+            .description(t("commands.namespaces.info.description"))
+            .argument("namespace", :optional, t("commands.common.arguments.namespace"))
+            .option("namespace", "t", :optional, t("commands.common.options.namespace"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.namespaces.info.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           namespace_input = input.argument("namespace", type: String | Nil) || input.option("namespace", type: String | Nil)
           if namespace_input.nil?
-            output.puts "You must specify a namespace ID or name."
+            output.puts t("runtime.errors.must_specify_namespace")
             return ACON::Command::Status::FAILURE
           end
           namespace = api.namespace(namespace_input)
           if input.option("json", type: Bool)
             output.puts namespace.to_json
           else
-            output.puts "Namespace: #{namespace.name} (#{namespace.id})"
+            output.puts t("runtime.namespaces.info.title", name: namespace.name, id: namespace.id)
           end
           return ACON::Command::Status::SUCCESS
         end
@@ -62,13 +62,13 @@ module Build
           # Team defaults to personal team
           self
             .name("namespaces:create")
-            .description("Create a new namespace")
-            .argument("name", :required, "The name of the namespace")
-            .option("zone", "z", :required, "The zone ID.")
-            .option("team", "t", :optional, "The team ID or name (default: personal).")
-            .option("region", "r", :optional, "The region (default: #{self.default_region}).")
-            .option("json", "j", :none, "Output in JSON format.")
-            .help("Create a new namespace.")
+            .description(t("commands.namespaces.create.description"))
+            .argument("name", :required, t("commands.namespaces.create.arguments.name"))
+            .option("zone", "z", :required, t("commands.common.options.zone"))
+            .option("team", "t", :optional, t("commands.namespaces.create.options.team"))
+            .option("region", "r", :optional, t("commands.common.options.region", region: self.default_region))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.namespaces.create.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
 
@@ -88,7 +88,7 @@ module Build
           if input.option("json", type: Bool)
             output.puts({name: name, zone_id: zone_id, region: region}.to_json)
           else
-            output.puts "Namespace created: #{name}"
+            output.puts t("runtime.namespaces.create.created", name: name)
           end
           return ACON::Command::Status::SUCCESS
         end
@@ -100,14 +100,14 @@ module Build
         protected def configure : Nil
           self
             .name("namespaces:delete")
-            .description("Delete a namespace")
-            .argument("namespace", :required, "The namespace ID or name")
-            .help("Delete a namespace.")
+            .description(t("commands.namespaces.delete.description"))
+            .argument("namespace", :required, t("commands.common.arguments.namespace"))
+            .help(t("commands.namespaces.delete.help"))
         end
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           namespace_input = input.argument("namespace", type: String | Nil) || input.option("namespace", type: String | Nil)
           if namespace_input.nil?
-            output.puts "You must specify a namespace ID or name."
+            output.puts t("runtime.errors.must_specify_namespace")
             return ACON::Command::Status::FAILURE
           end
           api.delete_namespace(namespace_input)

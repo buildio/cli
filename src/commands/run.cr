@@ -19,40 +19,18 @@ module Build
       protected def configure : Nil
         self
           .name("run")
-          .argument("cmd", :is_array, "The command to run", [] of String)
-          .option("app", "a", :required, "The app to run the command on")
-          .option("debug", nil, :none, "Show verbose debugging information")
-          .option("no-tty", nil, :none, "Force the command to not run in a tty")
-          .option("exit-code", "x", :none, "Passthrough the exit code of the remote command")
-          .option("file", "f", :optional, "Send a local file as stdin to the remote command")
-          .option("shell", "c", :none, "Pass the command to the remote shell for interpretation (enables $VAR, globs, pipes, multi-command)")
-          .description("Run a command in a once-off dyno on the Build platform")
-          .help(<<-HELP
-          Run a one-off command on the Build platform. Useful for migrations,
-          console sessions, or ad-hoc scripts.
-
-          By default each argument is POSIX single-quoted before being sent to
-          the remote side, so parentheses, braces, quotes, $VAR, globs, and
-          other shell metacharacters reach the target process literally:
-
-            bld run ruby -e 'puts ENV["HOME"]' -a my-app
-            bld run rake 'test:unit[foo,bar]' -a my-app
-
-          Use -c/--shell when you actually want the remote shell to interpret
-          metacharacters (variable expansion, pipes, multiple commands):
-
-            bld run -c 'echo $RAILS_ENV | tee /tmp/env' -a my-app
-
-          Use --file (or stdin redirection) to send a local file as stdin and
-          sidestep quoting entirely:
-
-            bld run rails runner -a my-app --file script.rb
-            bld run rails runner -a my-app < script.rb
-          HELP
-          )
-          .usage("bash -a my-app")
-          .usage("rails runner -a my-app --file script.rb")
-          .usage("-c 'echo $HOME | wc -c' -a my-app")
+          .argument("cmd", :is_array, t("commands.run.arguments.cmd"), [] of String)
+          .option("app", "a", :required, t("commands.run.options.app"))
+          .option("debug", nil, :none, t("commands.run.options.debug"))
+          .option("no-tty", nil, :none, t("commands.run.options.no_tty"))
+          .option("exit-code", "x", :none, t("commands.run.options.exit_code"))
+          .option("file", "f", :optional, t("commands.run.options.file"))
+          .option("shell", "c", :none, t("commands.run.options.shell"))
+          .description(t("commands.run.description"))
+          .help(t("commands.run.help"))
+          .usage(t("runtime.run.usage.bash"))
+          .usage(t("runtime.run.usage.file"))
+          .usage(t("runtime.run.usage.shell"))
           #.aliases(["exec", "shell", "console"])
       end
 
@@ -69,13 +47,13 @@ module Build
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         user_token = self.token
         if user_token.nil?
-          output.puts "You need to be logged in to run a command."
+          output.puts t("runtime.errors.need_login_to_run")
           return ACON::Command::Status::FAILURE
         end
 
         app_id = input.option("app")
         unless app_id
-          output.puts "No app specified. Please use the --app option to specify the app to run the command on."
+          output.puts t("runtime.run.no_app")
           return ACON::Command::Status::FAILURE
         end
 
@@ -87,7 +65,7 @@ module Build
 
         # Validate --file if specified
         if file_path && !File.exists?(file_path)
-          output.puts "File not found: #{file_path}"
+          output.puts t("runtime.run.file_not_found", path: file_path)
           return ACON::Command::Status::FAILURE
         end
 
@@ -103,37 +81,37 @@ module Build
 
         remote_exit_code : Int32? = nil
 
-        spinner = dots_spinner("Retrieving app region")
+        spinner = dots_spinner(t("runtime.run.spinner.retrieving_region"))
 
         app = self.api.app(app_id)
 
         ssh_host = app.ssh_host
         ssh_port = app.ssh_port
-        spinner.update(status: "Connecting to server")
+        spinner.update(status: t("runtime.run.spinner.connecting_server"))
 
         if verbose
-          output.puts "Verbose mode enabled"
-          output.puts "Connecting to #{ssh_host}:#{ssh_port}"
-          output.puts "App: #{app.name}"
-          output.puts "Terminal size: #{width}x#{height}"
+          output.puts t("runtime.run.verbose.enabled")
+          output.puts t("runtime.run.verbose.connecting", host: ssh_host, port: ssh_port)
+          output.puts t("runtime.labels.app", value: app.name)
+          output.puts t("runtime.run.verbose.terminal_size", width: width, height: height)
         end
 
         SSH2::Session.open(ssh_host, ssh_port) do |session|
-          spinner.update(status: "Logging in")
+          spinner.update(status: t("runtime.run.spinner.logging_in"))
           if verbose
-            output.puts "SSH connection established"
-            output.puts "Authenticating with app: #{app.name}"
+            output.puts t("runtime.run.verbose.ssh_established")
+            output.puts t("runtime.run.verbose.authenticating", app: app.name)
           end
           
           begin
             session.login(app.name, user_token)
             if verbose
-              output.puts "SSH authentication successful"
+              output.puts t("runtime.run.verbose.auth_success")
             end
           rescue e : SSH2::SessionError
-            spinner.error("Login failed")
+            spinner.error(t("runtime.login.failed"))
             if verbose
-              output.puts "SSH authentication error: #{e.message}"
+              output.puts t("runtime.run.verbose.auth_error", error: e.message)
             end
             exit
           end
@@ -145,27 +123,27 @@ module Build
           # on interactive sessions for the same reason.
           session.socket.as(TCPSocket).tcp_nodelay = true
           if verbose
-            output.puts "TCP_NODELAY enabled on SSH socket"
+            output.puts t("runtime.run.verbose.tcp_nodelay")
           end
 
-          spinner.update(status: "Opening channel")
+          spinner.update(status: t("runtime.run.spinner.opening_channel"))
           if verbose
-            output.puts "Opening SSH channel"
+            output.puts t("runtime.run.verbose.opening_channel")
           end
           
           session.open_session do |channel|
             # Request PTY only for interactive sessions
             if use_tty
               if verbose
-                output.puts "Requesting PTY with terminal type: xterm-256color"
+                output.puts t("runtime.run.verbose.requesting_pty", term: "xterm-256color")
               end
               channel.request_pty("xterm-256color", width: width, height: height)
             elsif verbose
-              output.puts "Running without PTY (--no-tty or non-interactive)"
+              output.puts t("runtime.run.verbose.no_pty")
             end
 
             if verbose
-              output.puts "Setting environment variables"
+              output.puts t("runtime.run.verbose.setting_env")
             end
 
             # Set environment variables for proper terminal handling
@@ -196,15 +174,15 @@ module Build
               if exit_code_mode
                 cmd_string = "#{cmd_string}; echo \"#{EXIT_CODE_SENTINEL} $?\""
               end
-              spinner.update(status: "Running #{display_cmd} on #{app.name}")
+              spinner.update(status: t("runtime.run.spinner.running", command: display_cmd, app: app.name))
               if verbose
-                output.puts "Executing command: #{cmd_string}"
+                output.puts t("runtime.run.verbose.executing", command: cmd_string)
               end
               channel.command(cmd_string)
             else
-              spinner.update(status: "Starting shell on #{app.name}")
+              spinner.update(status: t("runtime.run.spinner.starting_shell", app: app.name))
               if verbose
-                output.puts "Starting interactive shell"
+                output.puts t("runtime.run.verbose.starting_shell")
               end
               channel.shell
             end
@@ -321,7 +299,7 @@ module Build
                 STDOUT.flush
               end
               if verbose
-                output.puts "Channel closed by remote host"
+                output.puts t("runtime.run.verbose.channel_closed")
               end
               break
             end

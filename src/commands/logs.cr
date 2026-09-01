@@ -5,16 +5,16 @@ module Build
       protected def configure : Nil
         self
           .name("logs")
-          .description("Display the logs for an application.")
-          .help("Display the logs for an application.")
+          .description(t("commands.logs.description"))
+          .help(t("commands.logs.help"))
           .aliases(["log"])
-          .usage("logs -t -a my-app -p web")
-          .option("app", "a", :required, "The name of the application.")
-          .option("process", "p", :optional, "The Procfile process to display logs for.")
-          .option("tail", "t", :none, "Tail the logs.")
-          .option("count", "c", :optional, "Number of lines to display.")
-          .option("source", "s", :optional, "The log source to display from (app or build).")
-          .option("zone", "z", :optional, "The zone to retrieve logs from.")
+          .usage(t("runtime.logs.usage"))
+          .option("app", "a", :required, t("commands.common.options.app_name"))
+          .option("process", "p", :optional, t("commands.logs.options.process"))
+          .option("tail", "t", :none, t("commands.logs.options.tail"))
+          .option("count", "c", :optional, t("commands.logs.options.count"))
+          .option("source", "s", :optional, t("commands.logs.options.source"))
+          .option("zone", "z", :optional, t("commands.logs.options.zone"))
       end
 
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -41,20 +41,21 @@ module Build
 
         user_token = self.token
         if user_token.nil?
-          output.puts "You need to be logged in to run a command."
+          output.puts t("runtime.errors.need_login_to_run")
           return ACON::Command::Status::FAILURE
         end
 
         params = URI::Params.encode(query_params)
         headers = HTTP::Headers.new
         headers["Authorization"] = "Bearer #{user_token}"
+        headers["Accept-Language"] = Build::Locale.accept_language
 
         # output.puts("Query params: #{query_params}")
         # output.puts("Params: #{params}")
         api_uri = Build.parsed_api_uri
         log_url_res = HTTP::Client.get(URI.new(api_uri.scheme, api_uri.host, api_uri.port, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
         if log_url_res.status_code != 200
-          output.puts("Failed to get log URL for app #{app}.")
+          output.puts(t("runtime.logs.failed_url", app: app))
           return ACON::Command::Status::FAILURE
         end
         log_url = JSON.parse(log_url_res.body)["url"].to_s

@@ -8,11 +8,11 @@ module Build
         protected def configure : Nil
           self
             .name("pipelines:list")
-            .description("list your pipelines")
-            .option("team", "t", :required, "Filter by team name or ID")
-            .option("json", "j", :none, "Output in JSON format")
-            .help("Lists pipelines accessible to the current user.\n\nUse -t to filter by team.")
-            .usage("pipelines -t my-team")
+            .description(t("commands.pipelines.list.description"))
+            .option("team", "t", :required, t("commands.common.options.team"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.pipelines.list.help"))
+            .usage(t("runtime.pipelines.list.usage"))
             .aliases(["pipelines"])
         end
 
@@ -25,7 +25,7 @@ module Build
           if input.option("json", type: Bool)
             output.puts pipelines.to_json
           else
-            output.puts("=== Pipelines")
+            output.puts(t("runtime.pipelines.list.title"))
             output.puts("")
             pipelines.each do |pipeline|
               colored_symbol = "►".colorize.fore(46_u8).dim
@@ -36,16 +36,7 @@ module Build
 
           ACON::Command::Status::SUCCESS
         rescue ex : Exception
-          error_msg = ex.message || ""
-          if error_msg.blank? || error_msg == ""
-            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-            output.puts "      1. Is the server running? (rails server)"
-            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-            output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-            output.puts "      Debug: #{ex.class.name}"
-          else
-            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-          end
+          print_api_error(output, ex)
           ACON::Command::Status::FAILURE
         end
       end
@@ -55,10 +46,10 @@ module Build
         protected def configure : Nil
           self
             .name("pipelines:info")
-            .description("show detailed information for a pipeline")
-            .argument("pipeline", :required, "pipeline name or ID")
-            .option("json", "j", :none, "Output in JSON format")
-            .help("Displays information about a specific pipeline")
+            .description(t("commands.pipelines.info.description"))
+            .argument("pipeline", :required, t("commands.common.arguments.pipeline"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .help(t("commands.pipelines.info.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -73,14 +64,14 @@ module Build
           else
             output.puts("#{"===".colorize(:light_gray)} #{pipeline.name.colorize.bold}")
             output.puts("")
-            output.puts("owner: #{pipeline.team.name} (team)")
+            output.puts(t("runtime.pipelines.info.owner", owner: pipeline.team.name))
             output.puts("")
             
             # Display environments if present
             if pipeline.responds_to?(:environments) && pipeline.environments
               envs = pipeline.environments
               if envs && !envs.empty?
-                output.puts("Environments:")
+                output.puts(t("runtime.pipelines.info.environments"))
                 envs.each do |env|
                   if env.responds_to?(:kind) && env.responds_to?(:id)
                     kind_display = env.kind.to_s.upcase
@@ -92,7 +83,7 @@ module Build
             end
             
             if apps.empty?
-              output.puts("No apps found in this pipeline.")
+              output.puts(t("runtime.pipelines.info.no_apps"))
             else
               # Sort by stage priority (review, staging, production), then by name
               stage_order = {"production" => 4, "staging" => 3, "development" => 2, "review" => 1}
@@ -106,7 +97,7 @@ module Build
               name_width = 33
               stage_width = 10
               
-              output.puts((" app name".ljust(name_width) + " stage".ljust(stage_width)).colorize.bold)
+              output.puts((t("runtime.pipelines.headers.app_name").ljust(name_width) + t("runtime.pipelines.headers.stage").ljust(stage_width)).colorize.bold)
               output.puts(" " + "─" * (name_width - 1) + " " + "─" * stage_width)
               
               sorted_apps.each do |app|
@@ -123,16 +114,7 @@ module Build
 
           ACON::Command::Status::SUCCESS
         rescue ex : Exception
-          error_msg = ex.message || ""
-          if error_msg.blank? || error_msg == ""
-            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-            output.puts "      1. Is the server running? (rails server)"
-            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-            output.puts "      3. Is the API URL correct? Set BUILD_API_URL=http://localhost:3000"
-            output.puts "      Debug: #{ex.class.name}"
-          else
-            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-          end
+          print_api_error(output, ex)
           ACON::Command::Status::FAILURE
         end
       end
@@ -142,10 +124,10 @@ module Build
         protected def configure : Nil
           self
             .name("pipelines:diff")
-            .option("app", "a", :required, "Source app to compare")
-            .option("json", "j", :none, "Output in JSON format")
-            .description("compares the latest release of this app to its downstream app(s)")
-            .help("Shows commit differences between a source app and its downstream pipeline targets.\n\nExamples:\n  bld pipelines:diff -a my-app-staging")
+            .option("app", "a", :required, t("commands.pipelines.diff.options.app"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .description(t("commands.pipelines.diff.description"))
+            .help(t("commands.pipelines.diff.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -153,15 +135,15 @@ module Build
           json_mode = input.option("json", type: Bool)
           app_name = input.option("app", type: String?) rescue nil
           if app_name.nil? || app_name.empty?
-            output.puts ">".colorize(:red).to_s + "   Error: specify an app with --app (-a)"
+            print_error(output, t("runtime.errors.specify_app_with_app_flag"))
             return ACON::Command::Status::FAILURE
           end
 
-          spinner = dots_spinner("Fetching diff")
+          spinner = dots_spinner(t("runtime.pipelines.diff.fetching"))
           app = self.api.app(app_name)
           pipeline = app.pipeline
           unless pipeline && pipeline.id
-            spinner.error("App #{app_name} is not in a pipeline")
+            spinner.error(t("runtime.pipelines.app_not_in_pipeline", app: app_name))
             return ACON::Command::Status::FAILURE
           end
           pipeline_id = pipeline.id.not_nil!
@@ -179,7 +161,7 @@ module Build
           source_name = diff_response.source.try(&.name) || app_name
 
           if diffs.nil? || diffs.empty?
-            output.puts "No downstream apps to compare."
+            output.puts t("runtime.pipelines.diff.no_downstream")
             return ACON::Command::Status::SUCCESS
           end
 
@@ -188,7 +170,7 @@ module Build
 
             if d.status == "error"
               output.puts ""
-              output.puts "#{source_name.colorize.fore(104_u8)} was not compared to #{target_name.colorize.fore(104_u8)}: #{d.error_message}"
+              output.puts t("runtime.pipelines.diff.not_compared", source: source_name.colorize.fore(104_u8).to_s, target: target_name.colorize.fore(104_u8).to_s, error: d.error_message)
               next
             end
 
@@ -198,16 +180,16 @@ module Build
 
             if ahead == 0 && behind == 0
               output.puts ""
-              output.puts "⬢ #{source_name.colorize.fore(104_u8)} is up to date with ⬢ #{target_name.colorize.fore(104_u8)}"
+              output.puts t("runtime.pipelines.diff.up_to_date", source: source_name.colorize.fore(104_u8).to_s, target: target_name.colorize.fore(104_u8).to_s)
               next
             end
 
             # Header
             output.puts ""
             parts = [] of String
-            parts << "ahead by #{ahead} commit#{"s" if ahead != 1}" if ahead > 0
-            parts << "behind by #{behind} commit#{"s" if behind != 1}" if behind > 0
-            output.puts "=== ⬢ #{source_name.colorize.fore(104_u8)} is #{parts.join(", ")} vs ⬢ #{target_name.colorize.fore(104_u8)}"
+            parts << t("runtime.pipelines.diff.ahead", count: ahead, plural: ahead != 1 ? "s" : "") if ahead > 0
+            parts << t("runtime.pipelines.diff.behind", count: behind, plural: behind != 1 ? "s" : "") if behind > 0
+            output.puts t("runtime.pipelines.diff.summary", source: source_name.colorize.fore(104_u8).to_s, changes: parts.join(", "), target: target_name.colorize.fore(104_u8).to_s)
 
             # Commit table
             if commits && !commits.empty?
@@ -220,25 +202,16 @@ module Build
                 }
               end
               output.puts ""
-              print_table(output, {"SHA", "Date", "Author", "Message"}, rows)
+              print_table(output, {t("runtime.pipelines.headers.sha"), t("runtime.pipelines.headers.date"), t("runtime.pipelines.headers.author"), t("runtime.pipelines.headers.message")}, rows)
             end
           end
 
           ACON::Command::Status::SUCCESS
         rescue ex : Build::ApiError
-          output.puts ">".colorize(:red).to_s + "   Error: #{ex.message}"
+          print_error(output, ex.message || "")
           ACON::Command::Status::FAILURE
         rescue ex : Exception
-          error_msg = ex.message || ""
-          if error_msg.blank?
-            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-            output.puts "      1. Is the server running?"
-            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-            output.puts "      3. Is the API URL correct? Set BUILD_API_URL"
-            output.puts "      Debug: #{ex.class.name}"
-          else
-            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-          end
+          print_api_error(output, ex, local_server_hint: false)
           ACON::Command::Status::FAILURE
         end
       end
@@ -248,12 +221,12 @@ module Build
         protected def configure : Nil
           self
             .name("pipelines:promote")
-            .option("app", "a", :required, "Source app to promote")
-            .option("to", "t", :optional, "Comma-separated target app names (default: all downstream)")
-            .option("no-wait", nil, :none, "Return immediately after creating the promotion")
-            .option("json", "j", :none, "Output in JSON format")
-            .description("promote the latest release of this app to its downstream app(s)")
-            .help("Promotes the latest release from a source app to its downstream pipeline targets.\n\nExamples:\n  bld pipelines:promote -a my-app-staging\n  bld pipelines:promote -a my-app-staging --to my-app-prod,my-app-prod-eu\n  bld pipelines:promote -a my-app-staging --no-wait")
+            .option("app", "a", :required, t("commands.pipelines.promote.options.app"))
+            .option("to", "t", :optional, t("commands.pipelines.promote.options.to"))
+            .option("no-wait", nil, :none, t("commands.pipelines.promote.options.no_wait"))
+            .option("json", "j", :none, t("commands.common.options.json"))
+            .description(t("commands.pipelines.promote.description"))
+            .help(t("commands.pipelines.promote.help"))
         end
 
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
@@ -262,17 +235,17 @@ module Build
           no_wait = input.option("no-wait", type: Bool)
           app_name = input.option("app", type: String?) rescue nil
           if app_name.nil? || app_name.empty?
-            output.puts ">".colorize(:red).to_s + "   Error: specify an app with --app (-a)"
+            print_error(output, t("runtime.errors.specify_app_with_app_flag"))
             return ACON::Command::Status::FAILURE
           end
           to_flag = input.option("to", type: String?) rescue nil
 
           # Resolve source app and its pipeline
-          spinner = dots_spinner("Fetching app info")
+          spinner = dots_spinner(t("runtime.pipelines.promote.fetching_app"))
           app = self.api.app(app_name)
           pipeline = app.pipeline
           unless pipeline && pipeline.id
-            spinner.error("App #{app_name} is not in a pipeline")
+            spinner.error(t("runtime.pipelines.app_not_in_pipeline", app: app_name))
             return ACON::Command::Status::FAILURE
           end
           pipeline_id = pipeline.id.not_nil!
@@ -291,8 +264,8 @@ module Build
 
           # Create promotion
           promotions_api = Build::PipelinePromotionsApi.new
-          target_desc = to_flag || "all downstream apps"
-          spinner = dots_spinner("Promoting #{app_name} to #{target_desc}")
+          target_desc = to_flag || t("runtime.pipelines.promote.all_downstream")
+          spinner = dots_spinner(t("runtime.pipelines.promote.promoting", app: app_name, target: target_desc))
           promotion = promotions_api.create_pipeline_promotion(pipeline_id, request)
           spinner.success
 
@@ -300,13 +273,13 @@ module Build
             if json_mode
               output.puts promotion.to_json
             else
-              output.puts "Promotion #{promotion.id} created (status: #{promotion.status})"
+              output.puts t("runtime.pipelines.promote.created", id: promotion.id, status: promotion.status)
             end
             return ACON::Command::Status::SUCCESS
           end
 
           # Poll until no longer pending
-          spinner = dots_spinner("Waiting for promotion to complete")
+          spinner = dots_spinner(t("runtime.pipelines.promote.waiting"))
           loop do
             break if promotion.status != "pending"
             sleep 1.5.seconds
@@ -325,7 +298,7 @@ module Build
             status_width = 10
 
             output.puts ""
-            output.puts((" app".ljust(name_width) + " status").colorize.bold)
+            output.puts((t("runtime.pipelines.headers.app").ljust(name_width) + t("runtime.pipelines.headers.status")).colorize.bold)
             output.puts(" " + "─" * (name_width - 1) + " " + "─" * status_width)
 
             promotion_targets.each do |target|
@@ -350,9 +323,9 @@ module Build
 
             output.puts ""
             if any_failed
-              output.puts "Promotion completed with failures.".colorize(:red)
+              output.puts t("runtime.pipelines.promote.completed_with_failures").colorize(:red)
             else
-              output.puts "Promotion successful.".colorize(:green)
+              output.puts t("runtime.pipelines.promote.successful").colorize(:green)
             end
           end
 
@@ -361,19 +334,10 @@ module Build
           end
           ACON::Command::Status::SUCCESS
         rescue ex : Build::ApiError
-          output.puts ">".colorize(:red).to_s + "   Error: #{ex.message}"
+          print_error(output, ex.message || "")
           ACON::Command::Status::FAILURE
         rescue ex : Exception
-          error_msg = ex.message || ""
-          if error_msg.blank?
-            output.puts ">".colorize(:red).to_s + "   API request failed. Please check:"
-            output.puts "      1. Is the server running?"
-            output.puts "      2. Is your API token valid? Check ~/.netrc or set BUILD_API_KEY"
-            output.puts "      3. Is the API URL correct? Set BUILD_API_URL"
-            output.puts "      Debug: #{ex.class.name}"
-          else
-            output.puts ">".colorize(:red).to_s + "   Error: #{error_msg}"
-          end
+          print_api_error(output, ex, local_server_hint: false)
           ACON::Command::Status::FAILURE
         end
       end
