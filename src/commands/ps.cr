@@ -44,31 +44,39 @@ module Build
             # output.puts("=== #{app_name_or_id} Processes")
             output.puts("=== #{dyno._type.colorize.green.bold} (#{dyno.size.colorize.cyan.bold}): #{dyno.display.colorize.white.bold} (#{dyno.processes.size.colorize.yellow.bold})")
             dyno.processes.each do |process|
-              # output.puts("  #{process.index}: #{process.status} (#{process.started_at}) #{process.restarts} restarts")
-              # Specify the expected format of the timestamp (ISO 8601 in this example)
-              started_at = Time.parse(process.started_at, "%Y-%m-%dT%H:%M:%S.%LZ", location: Time::Location::UTC)
+              started_at_time = parse_timestamp?(process.started_at)
               status = process.status == "Running" ? "up".colorize.green : "down".colorize.red
 
-              # dotiw = (Time.utc - started_at).total_seconds.to_i.seconds
-              dotiw = distance_of_time_in_words(started_at)
-
-              entry = "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " +
-                "#{started_at.to_s.colorize(:dark_gray)} (~ #{dotiw.colorize.yellow} ago)"
-
+              entry = if started_at_time
+                dotiw = distance_of_time_in_words(started_at_time)
+                "#{dyno._type.colorize(:white)}.#{process.index}: #{status} " +
+                  "#{started_at_time.to_s.colorize(:dark_gray)} (~ #{dotiw.colorize.yellow} ago)"
+              else
+                "#{dyno._type.colorize(:white)}.#{process.index}: #{status} #{process.started_at.colorize(:dark_gray)}"
+              end
 
               restarts     = process.restarts
               restarted_at = process.restarted_at
               if restarted_at && restarts && restarts > 0
                 entry += " #{process.restarts} restarts"
-                restarted_at_time = Time.parse(restarted_at, "%Y-%m-%dT%H:%M:%S.%LZ", location: Time::Location::UTC)
-                dotiw = distance_of_time_in_words(restarted_at_time)
-                entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+                if restarted_at_time = parse_timestamp?(restarted_at)
+                  dotiw = distance_of_time_in_words(restarted_at_time)
+                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)} ~ #{dotiw.colorize.yellow} ago)"
+                else
+                  entry += " (last at #{restarted_at.to_s.colorize(:dark_gray)})"
+                end
               end
               output.puts entry
             end
             output.puts "" # Line break
           end
           return ACON::Command::Status::SUCCESS
+        end
+
+        private def parse_timestamp?(value : String) : Time?
+          Time.parse_iso8601(value)
+        rescue Time::Format::Error | ArgumentError
+          nil
         end
       end
       @[ACONA::AsCommand("ps:restart")]
