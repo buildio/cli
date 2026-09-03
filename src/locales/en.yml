@@ -93,7 +93,8 @@ en:
         app_name: "The name of the application."
         environment: "The environment ID (for pipeline environments)."
         json: "Output in JSON format."
-        num: "Number of records to show (default 25, max 100)."
+        num: "Page size (default 25, max 100)."
+        all: "Fetch every page by following the Link header."
         namespace: "The namespace."
         region: "The region (default: %{region})."
         shell: "Output in shell format."
@@ -234,7 +235,7 @@ en:
           build: "Build ID."
       list:
         description: "List builds for an app."
-        help: "Lists the most recent builds for an app, newest first.\n\nExamples:\n  bld builds -a my-app\n  bld builds -a my-app --num 5\n  bld builds -a my-app -j"
+        help: "Lists builds for an app, newest first. One page by default; --all follows the Link header to the end.\n\nExamples:\n  bld builds -a my-app\n  bld builds -a my-app --num 5\n  bld builds -a my-app --all -j"
       info:
         description: "Show detailed information for a build."
         help: "Displays information about a single build.\n\nExamples:\n  bld builds:info BUILD_ID -a my-app"
@@ -244,7 +245,7 @@ en:
           deployment: "Deployment ID."
       list:
         description: "List deployments (releases) for an app."
-        help: "Lists the most recent deployments for an app, newest first. `bld releases` is an alias.\n\nExamples:\n  bld deployments -a my-app\n  bld releases -a my-app --num 5\n  bld deployments -a my-app -j"
+        help: "Lists deployments for an app, newest first. `bld releases` is an alias. One page by default; --all follows the Link header to the end.\n\nExamples:\n  bld deployments -a my-app\n  bld releases -a my-app --num 5\n  bld deployments -a my-app --all -j"
       info:
         description: "Show detailed information for a deployment."
         help: "Displays information about a single deployment. `bld releases:info` is an alias.\n\nExamples:\n  bld deployments:info DEPLOYMENT_ID -a my-app"
@@ -1010,9 +1011,10 @@ en:
       command_reference_builds: |-
         --- Builds and deployments ---
 
-        # List recent builds (newest first; --num caps the count, max 100)
+        # List builds (newest first; one page of --num, max 100; --all follows pagination)
         bld builds -a APP
-        bld builds -a APP --num 5 -j | jq '.[] | {id, state, version: .source_blob.version}'
+        bld builds -a APP --num 5 -j
+        bld builds -a APP --all -j | jq '.[] | {id, state, version: .source_blob.version}'
 
         # Inspect one build
         bld builds:info BUILD_ID -a APP

@@ -21,6 +21,7 @@ module Build
             .description(t("commands.builds.list.description"))
             .option("app", "a", :optional, t("commands.common.options.app"))
             .option("num", nil, :optional, t("commands.common.options.num"))
+            .option("all", nil, :none, t("commands.common.options.all"))
             .option("json", "j", :none, t("commands.common.options.json"))
             .help(t("commands.builds.list.help"))
             .aliases(["builds"])
@@ -33,7 +34,14 @@ module Build
             return ACON::Command::Status::FAILURE
           end
           limit = input.option("num", type: String?).try(&.to_i)
-          builds = api.builds(app_input, limit)
+          builds = [] of ::Build::Build
+          cursor = nil
+          loop do
+            page, _status, headers = api.builds_with_http_info(app_input, limit, cursor)
+            builds.concat(page)
+            cursor = input.option("all", type: Bool) ? next_cursor(headers) : nil
+            break if cursor.nil?
+          end
 
           if input.option("json", type: Bool)
             output.puts builds.to_json

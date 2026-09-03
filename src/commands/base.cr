@@ -1,5 +1,6 @@
 require "build-client"
 require "../display_width"
+require "uri"
 
 module Build
   module Commands
@@ -63,6 +64,18 @@ module Build
         else
           print_error(output, error_msg)
         end
+      end
+
+      # Cursor from an RFC 8288 Link header's rel="next" URL, or nil on the last page.
+      def next_cursor(headers : Hash(String, Array(String) | String)) : String?
+        link = headers["Link"]? || headers["link"]?
+        link = link.join(",") if link.is_a?(Array)
+        link.try &.split(",").each do |part|
+          next unless part.includes?(%(rel="next"))
+          url = part[/<([^>]+)>/, 1]?
+          return URI.parse(url).query_params["cursor"]? if url
+        end
+        nil
       end
 
       def print_table(output : ACON::Output::Interface, headers : Tuple, rows : Array(Tuple))

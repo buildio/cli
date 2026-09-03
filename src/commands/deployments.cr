@@ -25,6 +25,7 @@ module Build
             .description(t("commands.deployments.list.description"))
             .option("app", "a", :optional, t("commands.common.options.app"))
             .option("num", nil, :optional, t("commands.common.options.num"))
+            .option("all", nil, :none, t("commands.common.options.all"))
             .option("json", "j", :none, t("commands.common.options.json"))
             .help(t("commands.deployments.list.help"))
             .aliases(["deployments", "releases", "releases:list"])
@@ -37,7 +38,14 @@ module Build
             return ACON::Command::Status::FAILURE
           end
           limit = input.option("num", type: String?).try(&.to_i)
-          deployments = api.deployments(app_input, limit)
+          deployments = [] of ::Build::Deployment
+          cursor = nil
+          loop do
+            page, _status, headers = api.deployments_with_http_info(app_input, limit, cursor)
+            deployments.concat(page)
+            cursor = input.option("all", type: Bool) ? next_cursor(headers) : nil
+            break if cursor.nil?
+          end
 
           if input.option("json", type: Bool)
             output.puts deployments.to_json
