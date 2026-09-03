@@ -19,7 +19,7 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api  # Ensure authentication is set up
           team_filter = input.option("team", type: String?)
-          pipelines_api = Build::PipelinesApi.new
+          pipelines_api = ::Build::PipelinesApi.new
           pipelines = pipelines_api.list_pipelines(team_id: team_filter).sort_by(&.name)
 
           if input.option("json", type: Bool)
@@ -55,7 +55,7 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           api  # Ensure authentication is set up
           pipeline_id = input.argument("pipeline", type: String)
-          pipelines_api = Build::PipelinesApi.new
+          pipelines_api = ::Build::PipelinesApi.new
           pipeline = pipelines_api.get_pipeline(pipeline_id)
           apps = pipelines_api.list_pipeline_apps(pipeline_id).sort_by(&.name)
 
@@ -148,7 +148,7 @@ module Build
           end
           pipeline_id = pipeline.id.not_nil!
 
-          pipelines_api = Build::PipelinesApi.new
+          pipelines_api = ::Build::PipelinesApi.new
           diff_response = pipelines_api.get_pipeline_diff(pipeline_id, app_name)
           spinner.success
 
@@ -207,7 +207,7 @@ module Build
           end
 
           ACON::Command::Status::SUCCESS
-        rescue ex : Build::ApiError
+        rescue ex : ::Build::ApiError
           print_error(output, ex.message || "")
           ACON::Command::Status::FAILURE
         rescue ex : Exception
@@ -252,18 +252,18 @@ module Build
           spinner.success
 
           # Build promotion request
-          source = Build::CreatePipelinePromotionRequestSource.new(app: app_name)
+          source = ::Build::CreatePipelinePromotionRequestSource.new(app: app_name)
           targets = if to_flag
                       to_flag.split(",").reject(&.empty?).map do |t|
-                        Build::CreatePipelinePromotionRequestTargetsInner.new(app: t.strip)
+                        ::Build::CreatePipelinePromotionRequestTargetsInner.new(app: t.strip)
                       end
                     else
                       nil
                     end
-          request = Build::CreatePipelinePromotionRequest.new(source: source, targets: targets)
+          request = ::Build::CreatePipelinePromotionRequest.new(source: source, targets: targets)
 
           # Create promotion
-          promotions_api = Build::PipelinePromotionsApi.new
+          promotions_api = ::Build::PipelinePromotionsApi.new
           target_desc = to_flag || t("runtime.pipelines.promote.all_downstream")
           spinner = dots_spinner(t("runtime.pipelines.promote.promoting", app: app_name, target: target_desc))
           promotion = promotions_api.create_pipeline_promotion(pipeline_id, request)
@@ -333,7 +333,7 @@ module Build
             return ACON::Command::Status::FAILURE
           end
           ACON::Command::Status::SUCCESS
-        rescue ex : Build::ApiError
+        rescue ex : ::Build::ApiError
           print_error(output, ex.message || "")
           ACON::Command::Status::FAILURE
         rescue ex : Exception

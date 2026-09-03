@@ -25,7 +25,7 @@ module Build
         user_token = nil
         user_email = nil
         client_secret = UUID.random
-        oauth_url = "#{Build.api_url}/cli_auth/authorize/#{client_secret}"
+        oauth_url = "#{::Build.api_url}/cli_auth/authorize/#{client_secret}"
         output.puts t("runtime.login.opening_browser", url: oauth_url.colorize.mode(:underline).to_s)
 
         frames = %w{⠙ ⠹ ⠸ ⠼ ⠴}
@@ -45,8 +45,8 @@ module Build
         timeout = Time::Span.new(seconds: timeout_seconds)
         start_time = Time.utc
         loop do
-          url = "#{Build.api_url}/api/cli_auth/resolve/#{client_secret}"
-          response = HTTP::Client.get(url, headers: HTTP::Headers{"Accept-Language" => Build::Locale.accept_language})
+          url = "#{::Build.api_url}/api/cli_auth/resolve/#{client_secret}"
+          response = HTTP::Client.get(url, headers: HTTP::Headers{"Accept-Language" => ::Build::Locale.accept_language})
           if response.status_code == 200
             json_response = JSON.parse(response.body)
             if json_response["code"].to_s == "unresolved"
@@ -70,8 +70,8 @@ module Build
         end
 
         user_netrc = Netrc.read
-        user_netrc[Build.api_host]  = {"#{user_email}", "#{user_token}"}
-        user_netrc[Build.git_host]  = {"#{user_email}", "#{user_token}"}
+        user_netrc[::Build.api_host]  = {"#{user_email}", "#{user_token}"}
+        user_netrc[::Build.git_host]  = {"#{user_email}", "#{user_token}"}
         user_netrc.save
         spinner.success
         output.puts t("runtime.login.logged_in_as", email: user_email.colorize(:green).to_s)

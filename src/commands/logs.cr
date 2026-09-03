@@ -48,11 +48,11 @@ module Build
         params = URI::Params.encode(query_params)
         headers = HTTP::Headers.new
         headers["Authorization"] = "Bearer #{user_token}"
-        headers["Accept-Language"] = Build::Locale.accept_language
+        headers["Accept-Language"] = ::Build::Locale.accept_language
 
         # output.puts("Query params: #{query_params}")
         # output.puts("Params: #{params}")
-        api_uri = Build.parsed_api_uri
+        api_uri = ::Build.parsed_api_uri
         log_url_res = HTTP::Client.get(URI.new(api_uri.scheme, api_uri.host, api_uri.port, path: "/api/apps/#{app}/logs/log_url", query: params), headers: headers)
         if log_url_res.status_code != 200
           output.puts(t("runtime.logs.failed_url", app: app))

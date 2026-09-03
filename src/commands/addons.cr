@@ -29,7 +29,7 @@ module Build
             if team_name && !team_name.blank?
               addons = self.list_team_addons(team_name)
             else
-              addons_api = Build::AddonsApi.new
+              addons_api = ::Build::AddonsApi.new
               addons = addons_api.list_app_addons(app_name.not_nil!)
             end
 
@@ -49,15 +49,15 @@ module Build
               end
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.list.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
-        private def list_team_addons(team_name : String) : Array(Build::Addon)
+        private def list_team_addons(team_name : String) : Array(::Build::Addon)
           path = "/api/v1/teams/#{URI.encode_path(team_name)}/addons"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           auth_names = ["bearer", "oauth2"]
@@ -65,7 +65,7 @@ module Build
             :"AddonsApi.list_app_addons", "Array(Addon)", nil, auth_names,
             header_params, Hash(String, String).new, Hash(String, String).new,
             Hash(Symbol, (String | ::File)).new)
-          Array(Build::Addon).from_json(data)
+          Array(::Build::Addon).from_json(data)
         end
       end
 
@@ -96,7 +96,7 @@ module Build
               print_table(output, headers, rows)
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.services.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -104,7 +104,7 @@ module Build
 
         private def fetch_services : String
           path = "/api/v1/addon-services"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           auth_names = ["bearer", "oauth2"]
@@ -151,7 +151,7 @@ module Build
               print_table(output, headers, rows)
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.plans.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -159,7 +159,7 @@ module Build
 
         private def fetch_plans(service_name : String) : String
           path = "/api/v1/addon-services/#{URI.encode_path(service_name)}/plans"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           auth_names = ["bearer", "oauth2"]
@@ -207,8 +207,8 @@ module Build
 
           begin
             api
-            addons_api = Build::AddonsApi.new
-            req = Build::CreateAddonRequest.new(plan: plan, name: addon_name, human_name: addon_human_name, description: addon_description, config: config)
+            addons_api = ::Build::AddonsApi.new
+            req = ::Build::CreateAddonRequest.new(plan: plan, name: addon_name, human_name: addon_human_name, description: addon_description, config: config)
             addon = addons_api.create_addon(app_name, req)
 
             if json_output
@@ -223,7 +223,7 @@ module Build
               end
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             # Try to parse structured error response for actionable suggestions
             if body = e.message
               begin
@@ -313,7 +313,7 @@ module Build
               end
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.info.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -321,7 +321,7 @@ module Build
 
         private def fetch_addon_info(addon_id : String) : String
           path = "/api/v1/addons/#{URI.encode_path(addon_id)}"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           auth_names = ["bearer", "oauth2"]
@@ -352,7 +352,7 @@ module Build
 
           begin
             api
-            addons_api = Build::AddonsApi.new
+            addons_api = ::Build::AddonsApi.new
             addon = addons_api.destroy_addon(app_name, addon_id)
 
             if json_output
@@ -362,7 +362,7 @@ module Build
               output.puts t("runtime.addons.destroy.done", name: name, app: app_name)
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.destroy.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -390,8 +390,8 @@ module Build
 
           begin
             api
-            attachments_api = Build::AddonAttachmentsApi.new
-            req = Build::CreateAddonAttachmentRequest.new(
+            attachments_api = ::Build::AddonAttachmentsApi.new
+            req = ::Build::CreateAddonAttachmentRequest.new(
               addon: addon_id,
               app: app_name,
               name: as_name,
@@ -405,7 +405,7 @@ module Build
               output.puts t("runtime.addons.attach.done", addon: addon_id, attachment: attachment.name, app: app_name)
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.attach.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -429,7 +429,7 @@ module Build
 
           begin
             api
-            attachments_api = Build::AddonAttachmentsApi.new
+            attachments_api = ::Build::AddonAttachmentsApi.new
             attachment = attachments_api.delete_addon_attachment(attachment_id)
 
             if json_output
@@ -438,7 +438,7 @@ module Build
               output.puts t("runtime.addons.detach.done", attachment: attachment.name)
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.addons.detach.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end

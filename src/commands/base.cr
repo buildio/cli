@@ -8,40 +8,40 @@ module Build
         raise "NotImplementedError"
       end
       def token : String | Nil
-        ENV.fetch("BUILD_API_KEY", nil) || Netrc.read[Build.api_host].try &.password
+        ENV.fetch("BUILD_API_KEY", nil) || Netrc.read[::Build.api_host].try &.password
       end
       def default_region : String
         ENV.fetch("BUILD_DEFAULT_REGION", "us-east-1")
       end
-      def api : Build::DefaultApi
+      def api : ::Build::DefaultApi
         user_token = ENV.fetch("BUILD_API_KEY", nil)
-        ent = Netrc.read[Build.api_host]
+        ent = Netrc.read[::Build.api_host]
         user_token ||= ent.password if ent
         if user_token.nil?
-          puts ">".colorize(:red).to_s + "   " + Build.t("runtime.errors.not_logged_in")
+          puts ">".colorize(:red).to_s + "   " + ::Build.t("runtime.errors.not_logged_in")
           exit(1)
         end
 
         # Host, scheme, and debugging are set globally.
         # We only need to configure the access_token here.
-        Build.configure do |config|
+        ::Build.configure do |config|
           config.access_token = user_token
         end
 
         # Configure the API client
-        @api_instance = Build::DefaultApi.new
+        @api_instance = ::Build::DefaultApi.new
       end
 
-      def buildpacks_api : Build::BuildpacksApi
+      def buildpacks_api : ::Build::BuildpacksApi
         api # ensure access_token is configured
-        Build::BuildpacksApi.new
+        ::Build::BuildpacksApi.new
       end
       def t(message_key : String | Symbol, params : Hash | NamedTuple | Nil = nil) : String
-        Build.t(message_key, params)
+        ::Build.t(message_key, params)
       end
 
       def t(message_key : String | Symbol, **kwargs) : String
-        Build.t(message_key, kwargs)
+        ::Build.t(message_key, kwargs)
       end
 
       def print_error(output : ACON::Output::Interface, message : String) : Nil
@@ -67,14 +67,14 @@ module Build
 
       def print_table(output : ACON::Output::Interface, headers : Tuple, rows : Array(Tuple))
         widths = Array(Int32).new(headers.size, 0)
-        headers.each_with_index { |h, i| widths[i] = {widths[i], Build.display_width(h.to_s)}.max }
+        headers.each_with_index { |h, i| widths[i] = {widths[i], ::Build.display_width(h.to_s)}.max }
         rows.each do |row|
-          row.each_with_index { |val, i| widths[i] = {widths[i], Build.display_width(val.to_s)}.max if i < widths.size }
+          row.each_with_index { |val, i| widths[i] = {widths[i], ::Build.display_width(val.to_s)}.max if i < widths.size }
         end
-        output.puts headers.each_with_index.map { |header, i| i == widths.size - 1 ? header.to_s : Build.ljust_display(header.to_s, widths[i]) }.join("  ")
+        output.puts headers.each_with_index.map { |header, i| i == widths.size - 1 ? header.to_s : ::Build.ljust_display(header.to_s, widths[i]) }.join("  ")
         output.puts widths.map { |w| "─" * w }.join("  ")
         rows.each do |row|
-          output.puts row.each_with_index.map { |val, i| i == widths.size - 1 ? val.to_s : Build.ljust_display(val.to_s, widths[i]) }.join("  ")
+          output.puts row.each_with_index.map { |val, i| i == widths.size - 1 ? val.to_s : ::Build.ljust_display(val.to_s, widths[i]) }.join("  ")
         end
       end
     end

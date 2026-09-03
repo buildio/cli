@@ -176,7 +176,7 @@ module Build
               end
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.ps.scale.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -200,7 +200,7 @@ module Build
               end
             end
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.ps.scale.failed_get_formation", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -208,7 +208,7 @@ module Build
 
         private def fetch_formation(app_id : String) : String
           path = "/api/v1/apps/#{URI.encode_path(app_id)}/formation"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           auth_names = ["bearer", "oauth2"]
@@ -221,7 +221,7 @@ module Build
 
         private def scale_formation(app_id : String, updates : Array(Hash(String, String | Int32))) : String
           path = "/api/v1/apps/#{URI.encode_path(app_id)}/formation"
-          api_client = Build::ApiClient.default
+          api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
           header_params["Content-Type"] = "application/json"
@@ -317,8 +317,8 @@ module Build
 
           spinner = dots_spinner(t("runtime.ps.exec.connecting", dyno: dyno))
 
-          host = Build.api_host
-          scheme = Build.api_host_scheme == "https" ? "wss" : "ws"
+          host = ::Build.api_host
+          scheme = ::Build.api_host_scheme == "https" ? "wss" : "ws"
           uri = URI.parse("#{scheme}://#{host}/cable?token=#{user_token}")
 
           identifier = {channel: "ExecChannel", app: app_id, dyno: dyno, command: command}.to_json
@@ -441,7 +441,7 @@ module Build
         end
 
         private def exec_dyno(app_id : String, dyno : String, command_parts : Array(String)) : String
-          request = Build::DynoExecRequest.new(command_parts)
+          request = ::Build::DynoExecRequest.new(command_parts)
           result  = api.exec_dyno(app_id, dyno, request)
           result.output
         end

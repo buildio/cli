@@ -22,7 +22,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             result = api_instance.list_domains(app_name)
             
             if json_output
@@ -32,13 +32,13 @@ module Build
             end
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.list.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
-        private def display_domains(output : ACON::Output::Interface, domains : Array(Build::Domain))
+        private def display_domains(output : ACON::Output::Interface, domains : Array(::Build::Domain))
           if domains.empty?
             output.puts t("runtime.domains.list.none")
             return
@@ -52,7 +52,7 @@ module Build
           
           if !platform_domains.empty?
             gray_equals = "===".colorize(:dark_gray)
-            title = Build.t("runtime.domains.list.platform_title", app: app_name).colorize.bold
+            title = ::Build.t("runtime.domains.list.platform_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
             platform_domains.each do |domain|
@@ -63,20 +63,20 @@ module Build
           
           if !custom_domains.empty?
             gray_equals = "===".colorize(:dark_gray)
-            title = Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
+            title = ::Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
             
             # Calculate column widths
             max_domain_width = custom_domains.map { |d| d.hostname.to_s.size }.max
-            domain_name_header = Build.t("runtime.domains.headers.domain_name")
+            domain_name_header = ::Build.t("runtime.domains.headers.domain_name")
             max_domain_width = [max_domain_width, domain_name_header.size].max
             
             # Print header - bold white
             header = " #{domain_name_header}".ljust(max_domain_width + 2)
-            header += Build.t("runtime.domains.headers.dns_record_type").ljust(17)
-            header += Build.t("runtime.domains.headers.dns_target").ljust(55)
-            header += Build.t("runtime.domains.headers.sni_endpoint")
+            header += ::Build.t("runtime.domains.headers.dns_record_type").ljust(17)
+            header += ::Build.t("runtime.domains.headers.dns_target").ljust(55)
+            header += ::Build.t("runtime.domains.headers.sni_endpoint")
             output.puts header.colorize.bold
             
             # Print separator line - bold white
@@ -106,7 +106,7 @@ module Build
             end
           else
             gray_equals = "===".colorize(:dark_gray)
-            title = Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
+            title = ::Build.t("runtime.domains.list.custom_title", app: app_name).colorize.bold
             output.puts "#{gray_equals} #{title}"
             output.puts ""
             output.puts t("runtime.domains.list.no_custom")
@@ -137,9 +137,9 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
-            request_body = Build::CreateDomainRequest.new(hostname: hostname, cert: cert)
+            request_body = ::Build::CreateDomainRequest.new(hostname: hostname, cert: cert)
             
             result = api_instance.create_domain(app_name, request_body)
             
@@ -155,7 +155,7 @@ module Build
             end
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.add.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -179,7 +179,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
             # First, get the list of domains to find the one with the matching hostname
             domains = api_instance.list_domains(app_name)
@@ -194,7 +194,7 @@ module Build
             output.puts "<info>#{t("runtime.domains.remove.removed", hostname: hostname, app: app_name)}</info>"
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.remove.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -216,7 +216,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
             # Get all domains for the app
             domains = api_instance.list_domains(app_name)
@@ -238,7 +238,7 @@ module Build
             output.puts "<info>#{t("runtime.domains.clear.cleared", app: app_name)}</info>"
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.clear.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -264,7 +264,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
             domains = api_instance.list_domains(app_name)
@@ -285,37 +285,37 @@ module Build
             end
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.info.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
-        private def display_domain_details(output : ACON::Output::Interface, domain : Build::Domain)
+        private def display_domain_details(output : ACON::Output::Interface, domain : ::Build::Domain)
           output.puts "=== <info>#{domain.hostname}</info>"
-          output.puts Build.t("runtime.labels.id", value: domain.id)
-          output.puts Build.t("runtime.labels.kind", value: domain.kind)
-          output.puts Build.t("runtime.labels.status", value: domain.status)
+          output.puts ::Build.t("runtime.labels.id", value: domain.id)
+          output.puts ::Build.t("runtime.labels.kind", value: domain.kind)
+          output.puts ::Build.t("runtime.labels.status", value: domain.status)
           
           if domain.cname
-            output.puts Build.t("runtime.labels.cname", value: domain.cname)
+            output.puts ::Build.t("runtime.labels.cname", value: domain.cname)
           end
           
           if domain.acm_status
-            output.puts Build.t("runtime.labels.acm_status", value: domain.acm_status)
+            output.puts ::Build.t("runtime.labels.acm_status", value: domain.acm_status)
             if reason = domain.acm_status_reason
               if !reason.to_s.empty?
-                output.puts Build.t("runtime.labels.acm_reason", value: reason)
+                output.puts ::Build.t("runtime.labels.acm_reason", value: reason)
               end
             end
           end
           
           if sni = domain.sni_endpoint
-            output.puts Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
+            output.puts ::Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
           end
           
-          output.puts Build.t("runtime.labels.created", value: domain.created_at)
-          output.puts Build.t("runtime.labels.updated", value: domain.updated_at)
+          output.puts ::Build.t("runtime.labels.created", value: domain.created_at)
+          output.puts ::Build.t("runtime.labels.updated", value: domain.updated_at)
         end
       end
 
@@ -340,7 +340,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
             domains = api_instance.list_domains(app_name)
@@ -351,7 +351,7 @@ module Build
               return ACON::Command::Status::FAILURE
             end
             
-            request_body = Build::UpdateDomainRequest.new(cert: cert)
+            request_body = ::Build::UpdateDomainRequest.new(cert: cert)
             
             result = api_instance.update_domain(app_name, domain.id.to_s, request_body)
             
@@ -363,7 +363,7 @@ module Build
             end
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.update.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
@@ -387,7 +387,7 @@ module Build
           
           begin
             api  # Ensure authentication is set up
-            api_instance = Build::DomainsApi.new
+            api_instance = ::Build::DomainsApi.new
             
             # Get the list of domains to find the one with the matching hostname
             domains = api_instance.list_domains(app_name)
@@ -402,18 +402,18 @@ module Build
             output.puts "<info>#{t("runtime.domains.wait.active", hostname: hostname)}</info>"
             
             return ACON::Command::Status::SUCCESS
-          rescue e : Build::ApiError
+          rescue e : ::Build::ApiError
             output.puts "<error>#{t("runtime.domains.wait.failed", error: e.message)}</error>"
             return ACON::Command::Status::FAILURE
           end
         end
 
         private def wait_for_domain(output : ACON::Output::Interface, app_id : String, domain_id : String)
-          api_instance = Build::DomainsApi.new
+          api_instance = ::Build::DomainsApi.new
           max_attempts = 60  # Wait up to 5 minutes
           attempt = 0
           
-          output.puts "<info>#{Build.t("runtime.domains.wait.waiting")}</info>"
+          output.puts "<info>#{::Build.t("runtime.domains.wait.waiting")}</info>"
           
           loop do
             attempt += 1
@@ -424,16 +424,16 @@ module Build
               if domain.status == "succeeded"
                 return
               elsif domain.status == "failed"
-                raise Build.t("runtime.domains.wait.activation_failed")
+                raise ::Build.t("runtime.domains.wait.activation_failed")
               end
               
               if attempt >= max_attempts
-                raise Build.t("runtime.domains.wait.timeout")
+                raise ::Build.t("runtime.domains.wait.timeout")
               end
               
               sleep 5.seconds
-            rescue e : Build::ApiError
-              raise Build.t("runtime.domains.wait.check_failed", error: e.message)
+            rescue e : ::Build::ApiError
+              raise ::Build.t("runtime.domains.wait.check_failed", error: e.message)
             end
           end
         end
@@ -441,39 +441,39 @@ module Build
 
       # Helper module with shared methods
       module SharedHelpers
-        def display_domain_details(output : ACON::Output::Interface, domain : Build::Domain)
+        def display_domain_details(output : ACON::Output::Interface, domain : ::Build::Domain)
           output.puts "=== <info>#{domain.hostname}</info>"
-          output.puts Build.t("runtime.labels.id", value: domain.id)
-          output.puts Build.t("runtime.labels.kind", value: domain.kind)
-          output.puts Build.t("runtime.labels.status", value: domain.status)
+          output.puts ::Build.t("runtime.labels.id", value: domain.id)
+          output.puts ::Build.t("runtime.labels.kind", value: domain.kind)
+          output.puts ::Build.t("runtime.labels.status", value: domain.status)
           
           if domain.cname
-            output.puts Build.t("runtime.labels.cname", value: domain.cname)
+            output.puts ::Build.t("runtime.labels.cname", value: domain.cname)
           end
           
           if domain.acm_status
-            output.puts Build.t("runtime.labels.acm_status", value: domain.acm_status)
+            output.puts ::Build.t("runtime.labels.acm_status", value: domain.acm_status)
             if reason = domain.acm_status_reason
               if !reason.to_s.empty?
-                output.puts Build.t("runtime.labels.acm_reason", value: reason)
+                output.puts ::Build.t("runtime.labels.acm_reason", value: reason)
               end
             end
           end
           
           if sni = domain.sni_endpoint
-            output.puts Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
+            output.puts ::Build.t("runtime.labels.sni_endpoint", value: sni.name) if sni.responds_to?(:name)
           end
           
-          output.puts Build.t("runtime.labels.created", value: domain.created_at)
-          output.puts Build.t("runtime.labels.updated", value: domain.updated_at)
+          output.puts ::Build.t("runtime.labels.created", value: domain.created_at)
+          output.puts ::Build.t("runtime.labels.updated", value: domain.updated_at)
         end
 
         def wait_for_domain(output : ACON::Output::Interface, app_id : String, domain_id : String)
-          api_instance = Build::DomainsApi.new
+          api_instance = ::Build::DomainsApi.new
           max_attempts = 60  # Wait up to 5 minutes
           attempt = 0
           
-          output.puts "<info>#{Build.t("runtime.domains.wait.waiting")}</info>"
+          output.puts "<info>#{::Build.t("runtime.domains.wait.waiting")}</info>"
           
           loop do
             attempt += 1
@@ -484,16 +484,16 @@ module Build
               if domain.status == "succeeded"
                 return
               elsif domain.status == "failed"
-                raise Build.t("runtime.domains.wait.activation_failed")
+                raise ::Build.t("runtime.domains.wait.activation_failed")
               end
               
               if attempt >= max_attempts
-                raise Build.t("runtime.domains.wait.timeout")
+                raise ::Build.t("runtime.domains.wait.timeout")
               end
               
               sleep 5.seconds
-            rescue e : Build::ApiError
-              raise Build.t("runtime.domains.wait.check_failed", error: e.message)
+            rescue e : ::Build::ApiError
+              raise ::Build.t("runtime.domains.wait.check_failed", error: e.message)
             end
           end
         end

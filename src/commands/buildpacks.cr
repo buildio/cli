@@ -7,9 +7,9 @@ module Build
 
       def self.display(output, app_name : String, buildpacks : Array(String))
         if buildpacks.empty?
-          output.puts Build.t("runtime.buildpacks.none", app: app_name)
+          output.puts ::Build.t("runtime.buildpacks.none", app: app_name)
         else
-          output.puts Build.t("runtime.buildpacks.title", app: app_name, plural: buildpacks.size == 1 ? "" : "s")
+          output.puts ::Build.t("runtime.buildpacks.title", app: app_name, plural: buildpacks.size == 1 ? "" : "s")
           output.puts ""
           buildpacks.each_with_index do |bp, i|
             output.puts "#{i + 1}. #{bp}"
@@ -18,18 +18,18 @@ module Build
       end
 
       def self.display_after_mutation(output, verb : String, app_name : String, buildpacks : Array(String))
-        output.puts Build.t("runtime.buildpacks.mutated", verb: verb)
+        output.puts ::Build.t("runtime.buildpacks.mutated", verb: verb)
         if buildpacks.empty?
-          output.puts Build.t("runtime.buildpacks.none", app: app_name)
+          output.puts ::Build.t("runtime.buildpacks.none", app: app_name)
         else
-          output.puts Build.t("runtime.buildpacks.next_release", app: app_name)
+          output.puts ::Build.t("runtime.buildpacks.next_release", app: app_name)
           buildpacks.each_with_index do |bp, i|
             output.puts "  #{i + 1}. #{bp}"
           end
         end
       end
 
-      def self.put_buildpacks(bp_api : Build::BuildpacksApi, app_id : String, urls : Array(String)) : Array(BuildpackInstallation)
+      def self.put_buildpacks(bp_api : ::Build::BuildpacksApi, app_id : String, urls : Array(String)) : Array(BuildpackInstallation)
         req = UpdateBuildpacksRequest.new(
           updates: urls.map { |u| UpdateBuildpacksRequestUpdatesInner.new(buildpack: u) }
         )

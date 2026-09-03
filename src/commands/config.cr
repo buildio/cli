@@ -59,7 +59,7 @@ module Build
               output.puts config_vars.to_json
             elsif input.option("shell", type: Bool)
               config_vars.each do |key, value|
-                output.puts Build::EnvFormat.shell_format_kv(key, value)
+                output.puts ::Build::EnvFormat.shell_format_kv(key, value)
               end
             else
               entity_name = (env_id && !env_id.blank?) ? t("runtime.labels.environment", id: env_id) : app_name_or_id
@@ -141,7 +141,7 @@ module Build
               output.puts result.to_json
             elsif input.option("shell", type: Bool)
               varnames.each do |varname|
-                output.puts Build::EnvFormat.shell_format_kv(varname, config_vars[varname])
+                output.puts ::Build::EnvFormat.shell_format_kv(varname, config_vars[varname])
               end
             else
               varnames.each do |varname|
@@ -178,7 +178,7 @@ module Build
         # dumping markup at the user.
         private def friendly_error(ex : Exception) : String
           body = (ex.message || "").strip
-          code = ex.is_a?(Build::ApiError) ? ex.code : nil
+          code = ex.is_a?(::Build::ApiError) ? ex.code : nil
           looks_html = body.starts_with?("<") ||
                        body.includes?("<!DOCTYPE") ||
                        body.includes?("<html")
@@ -192,10 +192,10 @@ module Build
           end
         end
 
-        # Parser lives in Build::EnvFormat. See env_format.cr for grammar
+        # Parser lives in ::Build::EnvFormat. See env_format.cr for grammar
         # and the security guarantee (this never evaluates shell).
         private def parse_stdin_env(raw : String) : Hash(String, String)
-          Build::EnvFormat.parse(raw)
+          ::Build::EnvFormat.parse(raw)
         end
 
 

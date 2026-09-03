@@ -56,12 +56,12 @@ module Build
     current_scheme = self.api_host_scheme
     sdk_debugging_flag = self.debugging?
     if self.debugging?
-      STDERR.puts Build.t("runtime.debug.global_api_config")
-      STDERR.puts Build.t("runtime.debug.host", host: current_host)
-      STDERR.puts Build.t("runtime.debug.scheme", scheme: current_scheme)
-      STDERR.puts Build.t("runtime.debug.sdk_debugging", enabled: sdk_debugging_flag)
+      STDERR.puts ::Build.t("runtime.debug.global_api_config")
+      STDERR.puts ::Build.t("runtime.debug.host", host: current_host)
+      STDERR.puts ::Build.t("runtime.debug.scheme", scheme: current_scheme)
+      STDERR.puts ::Build.t("runtime.debug.sdk_debugging", enabled: sdk_debugging_flag)
     end
-    Build.configure do |config|
+    ::Build.configure do |config|
       config.host       = current_host
       config.scheme     = current_scheme
       config.debugging  = sdk_debugging_flag
@@ -69,81 +69,81 @@ module Build
   end
 end
 
-Build::Locale.init
-Build.setup_global_api_config # Call it once to configure the API client globally
+::Build::Locale.init
+::Build.setup_global_api_config # Call it once to configure the API client globally
 
 application = ACON::Application.new "Build.io CLI", version: VERSION
-application.definition = Build::Console.default_input_definition
+application.definition = ::Build::Console.default_input_definition
 
 # Register commands using the `#add` method
-application.add Build::Commands::Help.new
-application.add Build::Commands::List.new
-application.add Build::Commands::Completion.new
-application.add Build::Commands::Whoami.new
-application.add Build::Commands::Login.new
-application.add Build::Commands::OidcLogin.new
+application.add ::Build::Commands::Help.new
+application.add ::Build::Commands::List.new
+application.add ::Build::Commands::Completion.new
+application.add ::Build::Commands::Whoami.new
+application.add ::Build::Commands::Login.new
+application.add ::Build::Commands::OidcLogin.new
 {% unless flag?(:win32) %}
-application.add Build::Commands::Run.new
+application.add ::Build::Commands::Run.new
 {% end %}
-application.add Build::Commands::Logs.new
-application.add Build::Commands::Skills.new
-application.add Build::Commands::App::Create.new
-application.add Build::Commands::App::List.new
-application.add Build::Commands::App::Info.new
-application.add Build::Commands::App::Stacks.new
-application.add Build::Commands::App::StacksSet.new
-application.add Build::Commands::Team::List.new
-application.add Build::Commands::Team::Info.new
-application.add Build::Commands::Namespace::List.new
-application.add Build::Commands::Namespace::Info.new
-application.add Build::Commands::Namespace::Create.new
-application.add Build::Commands::Namespace::Delete.new
+application.add ::Build::Commands::Logs.new
+application.add ::Build::Commands::Skills.new
+application.add ::Build::Commands::App::Create.new
+application.add ::Build::Commands::App::List.new
+application.add ::Build::Commands::App::Info.new
+application.add ::Build::Commands::App::Stacks.new
+application.add ::Build::Commands::App::StacksSet.new
+application.add ::Build::Commands::Team::List.new
+application.add ::Build::Commands::Team::Info.new
+application.add ::Build::Commands::Namespace::List.new
+application.add ::Build::Commands::Namespace::Info.new
+application.add ::Build::Commands::Namespace::Create.new
+application.add ::Build::Commands::Namespace::Delete.new
 
-application.add Build::Commands::Config::List.new
-application.add Build::Commands::Config::Info.new
-application.add Build::Commands::Config::Create.new
-application.add Build::Commands::Config::Delete.new
+application.add ::Build::Commands::Config::List.new
+application.add ::Build::Commands::Config::Info.new
+application.add ::Build::Commands::Config::Create.new
+application.add ::Build::Commands::Config::Delete.new
 
-application.add Build::Commands::Process::List.new
-application.add Build::Commands::Process::Delete.new
-application.add Build::Commands::Process::Scale.new
-application.add Build::Commands::Process::Exec.new
+application.add ::Build::Commands::Process::List.new
+application.add ::Build::Commands::Process::Delete.new
+application.add ::Build::Commands::Process::Scale.new
+application.add ::Build::Commands::Process::Exec.new
 
-application.add Build::Commands::Pipeline::List.new
-application.add Build::Commands::Pipeline::Info.new
-application.add Build::Commands::Pipeline::Diff.new
-application.add Build::Commands::Pipeline::Promote.new
+application.add ::Build::Commands::Pipeline::List.new
+application.add ::Build::Commands::Pipeline::Info.new
+application.add ::Build::Commands::Pipeline::Diff.new
+application.add ::Build::Commands::Pipeline::Promote.new
 
 # Addon management commands
-application.add Build::Commands::Addons::List.new
-application.add Build::Commands::Addons::Services.new
-application.add Build::Commands::Addons::Plans.new
-application.add Build::Commands::Addons::Create.new
-application.add Build::Commands::Addons::Info.new
-application.add Build::Commands::Addons::Destroy.new
-application.add Build::Commands::Addons::Attach.new
-application.add Build::Commands::Addons::Detach.new
+application.add ::Build::Commands::Addons::List.new
+application.add ::Build::Commands::Addons::Services.new
+application.add ::Build::Commands::Addons::Plans.new
+application.add ::Build::Commands::Addons::Create.new
+application.add ::Build::Commands::Addons::Info.new
+application.add ::Build::Commands::Addons::Destroy.new
+application.add ::Build::Commands::Addons::Attach.new
+application.add ::Build::Commands::Addons::Detach.new
 
 # Buildpack management commands
-application.add Build::Commands::Buildpacks::List.new
-application.add Build::Commands::Buildpacks::Add.new
-application.add Build::Commands::Buildpacks::Set.new
-application.add Build::Commands::Buildpacks::Remove.new
-application.add Build::Commands::Buildpacks::Clear.new
+application.add ::Build::Commands::Buildpacks::List.new
+application.add ::Build::Commands::Buildpacks::Add.new
+application.add ::Build::Commands::Buildpacks::Set.new
+application.add ::Build::Commands::Buildpacks::Remove.new
+application.add ::Build::Commands::Buildpacks::Clear.new
 
 # Domain management commands
-application.add Build::Commands::Domains::List.new
-application.add Build::Commands::Domains::Add.new
-application.add Build::Commands::Domains::Remove.new
-application.add Build::Commands::Domains::Clear.new
-application.add Build::Commands::Domains::Info.new
-application.add Build::Commands::Domains::Update.new
-application.add Build::Commands::Domains::Wait.new
+application.add ::Build::Commands::Domains::List.new
+application.add ::Build::Commands::Domains::Add.new
+application.add ::Build::Commands::Domains::Remove.new
+application.add ::Build::Commands::Domains::Clear.new
+application.add ::Build::Commands::Domains::Info.new
+application.add ::Build::Commands::Domains::Update.new
+application.add ::Build::Commands::Domains::Wait.new
 
 # Check for a newer released version on GitHub. Cached to at most one
 # request per day and silently no-ops on any failure or when disabled via
 # BUILD_NO_UPDATE_CHECK.
-Build::UpdateCheck.check!(VERSION)
+::Build::UpdateCheck.check!(VERSION)
 
 # Run the application.
 # By default this uses STDIN and STDOUT for its input and output.

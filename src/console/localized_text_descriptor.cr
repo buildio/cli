@@ -6,13 +6,13 @@ module Build
   module Console
     def self.default_input_definition(default_command = "list") : ACON::Input::Definition
       ACON::Input::Definition.new(
-        ACON::Input::Argument.new("command", :required, Build.t("console.global.command")),
-        ACON::Input::Option.new("help", "h", description: Build.t("console.global.help", command: default_command)),
-        ACON::Input::Option.new("quiet", "q", description: Build.t("console.global.quiet")),
-        ACON::Input::Option.new("verbose", "v|vv|vvv", description: Build.t("console.global.verbose")),
-        ACON::Input::Option.new("version", "V", description: Build.t("console.global.version")),
-        ACON::Input::Option.new("ansi", value_mode: :negatable, description: Build.t("console.global.ansi"), default: false),
-        ACON::Input::Option.new("no-interaction", "n", description: Build.t("console.global.no_interaction")),
+        ACON::Input::Argument.new("command", :required, ::Build.t("console.global.command")),
+        ACON::Input::Option.new("help", "h", description: ::Build.t("console.global.help", command: default_command)),
+        ACON::Input::Option.new("quiet", "q", description: ::Build.t("console.global.quiet")),
+        ACON::Input::Option.new("verbose", "v|vv|vvv", description: ::Build.t("console.global.verbose")),
+        ACON::Input::Option.new("version", "V", description: ::Build.t("console.global.version")),
+        ACON::Input::Option.new("ansi", value_mode: :negatable, description: ::Build.t("console.global.ansi"), default: false),
+        ACON::Input::Option.new("no-interaction", "n", description: ::Build.t("console.global.no_interaction")),
       )
     end
 
@@ -60,7 +60,7 @@ module Build
         )
 
         if described_namespace
-          self.write_text %(<comment>#{Build.t("console.descriptor.available_namespace_commands", namespace: described_namespace)}</comment>), context
+          self.write_text %(<comment>#{::Build.t("console.descriptor.available_namespace_commands", namespace: described_namespace)}</comment>), context
         else
           self.write_text "<comment>#{label("available_commands")}</comment>", context
         end
@@ -77,7 +77,7 @@ module Build
 
           namespace[:commands].each do |name|
             self.write_text "\n"
-            spacing_width = width - Build.display_width(name)
+            spacing_width = width - ::Build.display_width(name)
             command = commands[name]
             command_aliases = name === command.name ? self.command_aliases_text command : ""
 
@@ -90,13 +90,13 @@ module Build
 
       protected def describe(argument : ACON::Input::Argument, context : ACON::Descriptor::Context) : Nil
         default = if !argument.default.nil? && !argument.default.is_a?(Array)
-                    %(<comment> #{Build.t("console.descriptor.default", value: self.format_default_value(argument.default))}</comment>)
+                    %(<comment> #{::Build.t("console.descriptor.default", value: self.format_default_value(argument.default))}</comment>)
                   else
                     ""
                   end
 
-        total_width = context.total_width || Build.display_width(argument.name)
-        spacing_width = total_width - Build.display_width(argument.name)
+        total_width = context.total_width || ::Build.display_width(argument.name)
+        spacing_width = total_width - ::Build.display_width(argument.name)
 
         self.write_text(
           sprintf(
@@ -150,7 +150,7 @@ module Build
         total_width = self.calculate_total_width_for_options definition.options
 
         definition.arguments.each_value do |arg|
-          total_width = Math.max total_width, Build.display_width(arg.name)
+          total_width = Math.max total_width, ::Build.display_width(arg.name)
         end
 
         unless definition.arguments.empty?
@@ -201,7 +201,7 @@ module Build
 
       protected def describe(option : ACON::Input::Option, context : ACON::Descriptor::Context) : Nil
         if option.accepts_value? && !option.default.nil? && (!option.default.is_a?(Array) || !option.default.as(Array).empty?)
-          default = %(<comment> #{Build.t("console.descriptor.default", value: self.format_default_value(option.default))}</comment>)
+          default = %(<comment> #{::Build.t("console.descriptor.default", value: self.format_default_value(option.default))}</comment>)
         else
           default = ""
         end
@@ -222,7 +222,7 @@ module Build
           (option.negatable? ? "--%<name>s|--no-%<name>s" : "--%<name>s%<value>s") % {name: option.name, value: value}
         )
 
-        spacing_width = total_width - Build.display_width(synopsis)
+        spacing_width = total_width - ::Build.display_width(synopsis)
 
         self.write_text(
           sprintf(
@@ -238,7 +238,7 @@ module Build
       end
 
       private def label(key : String) : String
-        Build.t("console.descriptor.#{key}")
+        ::Build.t("console.descriptor.#{key}")
       end
 
       private def calculate_total_width_for_options(options : Hash(String, ACON::Input::Option)) : Int32
@@ -249,12 +249,12 @@ module Build
         return 0 if options.empty?
 
         options.max_of do |o|
-          name_length = 1 + Math.max(Build.display_width(o.shortcut || ""), 1) + 4 + Build.display_width(o.name)
+          name_length = 1 + Math.max(::Build.display_width(o.shortcut || ""), 1) + 4 + ::Build.display_width(o.name)
 
           if o.negatable?
-            name_length += 6 + Build.display_width(o.name)
+            name_length += 6 + ::Build.display_width(o.name)
           elsif o.accepts_value?
-            name_length += 1 + Build.display_width(o.name) + (o.value_optional? ? 2 : 0)
+            name_length += 1 + ::Build.display_width(o.name) + (o.value_optional? ? 2 : 0)
           end
 
           name_length
@@ -288,13 +288,13 @@ module Build
         commands.each do |command|
           case command
           in ACON::Command
-            widths << Build.display_width command.name.not_nil!
+            widths << ::Build.display_width command.name.not_nil!
 
             command.aliases.each do |a|
-              widths << Build.display_width a
+              widths << ::Build.display_width a
             end
           in String
-            widths << Build.display_width command
+            widths << ::Build.display_width command
           end
         end
 

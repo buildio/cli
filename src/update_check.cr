@@ -175,7 +175,7 @@ module Build
     end
 
     private def self.notice(current : String, latest : String) : String
-      Build.t("runtime.update_check.notice",
+      ::Build.t("runtime.update_check.notice",
         current: current.colorize(:yellow).to_s,
         latest: latest.colorize(:green).to_s,
         repo: GITHUB_REPO)
