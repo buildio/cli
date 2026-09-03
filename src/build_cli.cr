@@ -114,6 +114,12 @@ application.add ::Build::Commands::Pipeline::Info.new
 application.add ::Build::Commands::Pipeline::Diff.new
 application.add ::Build::Commands::Pipeline::Promote.new
 
+# Build and deployment history
+application.add ::Build::Commands::Builds::List.new
+application.add ::Build::Commands::Builds::Info.new
+application.add ::Build::Commands::Deployments::List.new
+application.add ::Build::Commands::Deployments::Info.new
+
 # Addon management commands
 application.add ::Build::Commands::Addons::List.new
 application.add ::Build::Commands::Addons::Services.new

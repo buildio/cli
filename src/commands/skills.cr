@@ -11,6 +11,7 @@ module Build
         "runtime.skills.command_reference_git_push",
         "runtime.skills.command_reference_processes",
         "runtime.skills.command_reference_buildpacks",
+        "runtime.skills.command_reference_builds",
         "runtime.skills.command_reference_addons",
         "runtime.skills.command_reference_domains",
         "runtime.skills.command_reference_pipelines",

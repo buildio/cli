@@ -81,6 +81,10 @@ private def metadata_app
   app.add Build::Commands::Pipeline::Info.new
   app.add Build::Commands::Pipeline::Diff.new
   app.add Build::Commands::Pipeline::Promote.new
+  app.add Build::Commands::Builds::List.new
+  app.add Build::Commands::Builds::Info.new
+  app.add Build::Commands::Deployments::List.new
+  app.add Build::Commands::Deployments::Info.new
   app.add Build::Commands::Addons::List.new
   app.add Build::Commands::Addons::Services.new
   app.add Build::Commands::Addons::Plans.new

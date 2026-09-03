@@ -93,6 +93,7 @@ en:
         app_name: "The name of the application."
         environment: "The environment ID (for pipeline environments)."
         json: "Output in JSON format."
+        num: "Number of records to show (default 25, max 100)."
         namespace: "The namespace."
         region: "The region (default: %{region})."
         shell: "Output in shell format."
@@ -227,6 +228,26 @@ en:
 
           Example:
             $ bld buildpacks:clear -a my-app
+    builds:
+      common:
+        arguments:
+          build: "Build ID."
+      list:
+        description: "List builds for an app."
+        help: "Lists the most recent builds for an app, newest first.\n\nExamples:\n  bld builds -a my-app\n  bld builds -a my-app --num 5\n  bld builds -a my-app -j"
+      info:
+        description: "Show detailed information for a build."
+        help: "Displays information about a single build.\n\nExamples:\n  bld builds:info BUILD_ID -a my-app"
+    deployments:
+      common:
+        arguments:
+          deployment: "Deployment ID."
+      list:
+        description: "List deployments (releases) for an app."
+        help: "Lists the most recent deployments for an app, newest first. `bld releases` is an alias.\n\nExamples:\n  bld deployments -a my-app\n  bld releases -a my-app --num 5\n  bld deployments -a my-app -j"
+      info:
+        description: "Show detailed information for a deployment."
+        help: "Displays information about a single deployment. `bld releases:info` is an alias.\n\nExamples:\n  bld deployments:info DEPLOYMENT_ID -a my-app"
     config:
       list:
         description: "Get the config variables for an app or environment."
@@ -504,6 +525,51 @@ en:
       specify_name_or_index: "Specify a buildpack name or use -i to specify an index."
       not_set: "Buildpack %{buildpack} is not set on %{app}."
       cleared: "Buildpacks cleared."
+    builds:
+      title: "=== Builds for %{app}"
+      none: "No builds for %{app}."
+      headers:
+        id: "ID"
+        state: "State"
+        version: "Version"
+        user: "User"
+        created: "Created"
+      info:
+        title: "Build for %{app}"
+        id: "ID:          %{value}"
+        state: "State:       %{value}"
+        user: "User:        %{value}"
+        source: "Source:      %{value}"
+        version: "Version:     %{value}"
+        description: "Description: %{value}"
+        stack: "Stack:       %{value}"
+        buildpacks: "Buildpacks:  %{value}"
+        created: "Created:     %{value}"
+        updated: "Updated:     %{value}"
+    deployments:
+      title: "=== Deployments for %{app}"
+      none: "No deployments for %{app}."
+      current_footnote: "* current deployment"
+      current_yes: "yes"
+      current_no: "no"
+      headers:
+        id: "ID"
+        version: "Version"
+        state: "State"
+        description: "Description"
+        user: "User"
+        created: "Created"
+      info:
+        title: "Deployment for %{app}"
+        id: "ID:          %{value}"
+        version: "Version:     %{value}"
+        state: "State:       %{value}"
+        current: "Current:     %{value}"
+        build: "Build:       %{value}"
+        user: "User:        %{value}"
+        description: "Description: %{value}"
+        created: "Created:     %{value}"
+        updated: "Updated:     %{value}"
     config:
       list:
         usage: "config:list -a my-app -s  OR  config:list -e ENV-ID -j"
@@ -941,6 +1007,22 @@ en:
 
         # TLS is provisioned automatically. Wait for it:
         bld domains:wait www.example.com -a APP
+      command_reference_builds: |-
+        --- Builds and deployments ---
+
+        # List recent builds (newest first; --num caps the count, max 100)
+        bld builds -a APP
+        bld builds -a APP --num 5 -j | jq '.[] | {id, state, version: .source_blob.version}'
+
+        # Inspect one build
+        bld builds:info BUILD_ID -a APP
+
+        # List deployments (releases); * marks the current one
+        bld deployments -a APP
+        bld releases -a APP -j | jq '.[] | select(.current) | {version, state, build: .build.id}'
+
+        # Inspect one deployment
+        bld deployments:info DEPLOYMENT_ID -a APP
       command_reference_pipelines: |-
         --- Pipelines (for mature apps) ---
 
