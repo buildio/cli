@@ -461,6 +461,7 @@ en:
       specify_app_or_team: "Specify --app or --team"
       specify_app_with_app_flag: "specify an app with --app (-a)"
       missing_app_or_dyno: "Missing required options --app and/or --dyno"
+    slow_request: "Still waiting on %{method} %{path} after %{seconds}s… (-q hides this)"
     debug:
       global_api_config: "[DEBUG] Setting up global API config with:"
       host: "[DEBUG]   Host: %{host}"
