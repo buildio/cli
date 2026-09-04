@@ -4,6 +4,7 @@ require "./display_width"
 require "./console/localized_text_descriptor"
 require "./ext/term_spinner"
 require "./ext/build_client_accept_language"
+require "./ext/crest_logger_stderr"
 require "./utils"
 require "./log_colorizer"
 require "./update_check"
@@ -22,10 +23,10 @@ VERSION = {{ `shards version #{__DIR__}`.chomp.stringify }}
 module Build
   private DEFAULT_API_URL = "https://app.build.io"
 
-  # This will now control both CLI debug messages and SDK debugging.
+  # Controls both CLI debug messages and SDK request logging: DEBUG=1 or -vvv.
   def self.debugging?
     val = ENV["DEBUG"]?
-    val == "true" || val == "1"
+    val == "true" || val == "1" || ARGV.includes?("-vvv")
   end
   def self.api_url
     ENV.fetch("BUILD_API_URL", DEFAULT_API_URL)

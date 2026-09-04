@@ -33,15 +33,18 @@ module Build
             output.puts t("runtime.errors.must_specify_app_option")
             return ACON::Command::Status::FAILURE
           end
-          limit = input.option("num", type: String?).try(&.to_i)
+          all = input.option("all", type: Bool)
+          limit = input.option("num", type: String?).try(&.to_i) || (all ? 100 : nil)
           builds = [] of ::Build::Build
           cursor = nil
           loop do
             page, _status, headers = api.builds_with_http_info(app_input, limit, cursor)
             builds.concat(page)
-            cursor = input.option("all", type: Bool) ? next_cursor(headers) : nil
+            cursor = all ? next_cursor(headers) : nil
             break if cursor.nil?
+            progress(t("runtime.builds.fetching", count: builds.size))
           end
+          progress_done
 
           if input.option("json", type: Bool)
             output.puts builds.to_json

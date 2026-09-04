@@ -66,6 +66,15 @@ module Build
         end
       end
 
+      # Transient progress line on STDERR, only when someone is watching.
+      def progress(message : String) : Nil
+        STDERR.print "\r\e[K#{message}" if STDERR.tty?
+      end
+
+      def progress_done : Nil
+        STDERR.print "\r\e[K" if STDERR.tty?
+      end
+
       # Cursor from an RFC 8288 Link header's rel="next" URL, or nil on the last page.
       def next_cursor(headers : Hash(String, Array(String) | String)) : String?
         link = headers["Link"]? || headers["link"]?

@@ -94,7 +94,7 @@ en:
         environment: "The environment ID (for pipeline environments)."
         json: "Output in JSON format."
         num: "Page size (default 25, max 100)."
-        all: "Fetch every page by following the Link header."
+        all: "Fetch every page by following the Link header (pages of 100 unless --num is given)."
         namespace: "The namespace."
         region: "The region (default: %{region})."
         shell: "Output in shell format."
@@ -528,6 +528,7 @@ en:
       cleared: "Buildpacks cleared."
     builds:
       title: "=== Builds for %{app}"
+      fetching: "Fetching builds… %{count} so far"
       none: "No builds for %{app}."
       headers:
         id: "ID"
@@ -549,6 +550,7 @@ en:
         updated: "Updated:     %{value}"
     deployments:
       title: "=== Deployments for %{app}"
+      fetching: "Fetching deployments… %{count} so far"
       none: "No deployments for %{app}."
       current_footnote: "* current deployment"
       current_yes: "yes"
