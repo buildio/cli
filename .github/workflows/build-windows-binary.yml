@@ -95,21 +95,41 @@ jobs:
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
           $env:BUILD_NO_UPDATE_CHECK = "1"
 
-          try {
-            $help = & "$smokeDir\bld.exe" --help 2>&1
-            if ($LASTEXITCODE -ne 0) {
-              throw "bld.exe --help exited with $LASTEXITCODE`n$($help -join "`n")"
+          function Invoke-BldSmoke {
+            param([string[]]$Arguments)
+
+            $stdout = Join-Path $env:RUNNER_TEMP "$([Guid]::NewGuid()).out"
+            $stderr = Join-Path $env:RUNNER_TEMP "$([Guid]::NewGuid()).err"
+
+            try {
+              $process = Start-Process -FilePath "$smokeDir\bld.exe" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+              $stdoutText = if (Test-Path $stdout) { Get-Content -Path $stdout -Raw -ErrorAction SilentlyContinue } else { "" }
+              $stderrText = if (Test-Path $stderr) { Get-Content -Path $stderr -Raw -ErrorAction SilentlyContinue } else { "" }
+
+              [PSCustomObject]@{
+                ExitCode = $process.ExitCode
+                Output = "$stdoutText$stderrText"
+              }
+            } finally {
+              Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
             }
-            if (-not (($help -join "`n") -match "Usage:")) {
-              throw "bld.exe --help produced no usage output`n$($help -join "`n")"
+          }
+
+          try {
+            $help = Invoke-BldSmoke @("--help")
+            if ($help.ExitCode -ne 0) {
+              throw "bld.exe --help exited with $($help.ExitCode)`n$($help.Output)"
+            }
+            if ($help.Output -notmatch "Usage:") {
+              throw "bld.exe --help produced no usage output`n$($help.Output)"
             }
 
-            $invalid = & "$smokeDir\bld.exe" asutnhus 2>&1
-            if ($LASTEXITCODE -eq 0) {
+            $invalid = Invoke-BldSmoke @("asutnhus")
+            if ($invalid.ExitCode -eq 0) {
               throw "unknown command unexpectedly succeeded"
             }
-            if (-not (($invalid -join "`n") -match "asutnhus")) {
-              throw "unknown command did not report the command name`n$($invalid -join "`n")"
+            if ($invalid.Output -notmatch "asutnhus") {
+              throw "unknown command did not report the command name`n$($invalid.Output)"
             }
           } finally {
             $env:PATH = $oldPath
