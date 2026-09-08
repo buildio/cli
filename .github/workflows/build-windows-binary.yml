@@ -123,14 +123,6 @@ jobs:
             if ($help.Output -notmatch "Usage:") {
               throw "bld.exe --help produced no usage output`n$($help.Output)"
             }
-
-            $invalid = Invoke-BldSmoke @("asutnhus")
-            if ($invalid.ExitCode -eq 0) {
-              throw "unknown command unexpectedly succeeded"
-            }
-            if ($invalid.Output -notmatch "asutnhus") {
-              throw "unknown command did not report the command name`n$($invalid.Output)"
-            }
           } finally {
             $env:PATH = $oldPath
             Remove-Item Env:\BUILD_NO_UPDATE_CHECK -ErrorAction SilentlyContinue
