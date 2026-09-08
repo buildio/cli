@@ -1,5 +1,14 @@
 # Build CLI
 
+## Install
+
+### Windows (Scoop)
+
+```powershell
+scoop bucket add buildio https://github.com/buildio/cli
+scoop install bld
+```
+
 ## Build
 
 ### Local Development Build

@@ -11,6 +11,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build-windows-binary:
     runs-on: windows-latest
@@ -67,3 +70,36 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Scoop manifest
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 bin/windows-amd64/bld-windows-amd64.zip).Hash.ToLowerInvariant()
+          $manifestPath = "bucket/bld.json"
+          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64.zip"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main FETCH_HEAD
+          git pull --ff-only origin main
+
+          $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
+          $manifest.version = $env:VERSION
+          $manifest.architecture."64bit".url = $downloadUrl
+          $manifest.architecture."64bit".hash = $hash
+
+          $json = $manifest | ConvertTo-Json -Depth 10
+          Set-Content -Path $manifestPath -Value $json -Encoding utf8
+          git add $manifestPath
+
+          $changedFiles = git diff --cached --name-only
+          if (-not $changedFiles) {
+            Write-Host "Scoop manifest already current."
+          } else {
+            git commit -m "Update Scoop manifest to v$env:VERSION"
+            git push origin main
+          }
+        shell: pwsh
