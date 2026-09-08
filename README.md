@@ -1,6 +1,11 @@
 # Build CLI
 
 ## Install
+### macOS (Homebrew)
+
+```zsh
+brew install buildio/cli/bld;brew trust buildio/cli
+```
 
 ### Windows (Scoop)
 
