@@ -11,70 +11,226 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   build-linux-binary:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      
+        with:
+          fetch-depth: 0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      
+
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly dpkg-dev gnupg
+
       - name: Build Linux binary
         run: |
           make build
-      
+
       - name: Get version
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           fi
-      
+
       - name: Create release zip
         run: |
           cd bin/linux-amd64
           zip -j bld-linux-amd64.zip bld
-      
+
+      - name: Build Debian package
+        id: deb
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+
+          DEB_VERSION="${VERSION}-1"
+          PACKAGE_ROOT="pkg/bld_${DEB_VERSION}_amd64"
+
+          rm -rf "$PACKAGE_ROOT"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN"
+          mkdir -p "$PACKAGE_ROOT/usr/bin"
+          mkdir -p "$PACKAGE_ROOT/usr/share/doc/bld"
+
+          install -m 0755 bin/linux-amd64/bld "$PACKAGE_ROOT/usr/bin/bld"
+          sed "s/@DEB_VERSION@/${DEB_VERSION}/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
+          install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/bld/copyright"
+
+          dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "bld_${DEB_VERSION}_amd64.deb"
+
+          echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "deb_path=bld_${DEB_VERSION}_amd64.deb" >> "$GITHUB_OUTPUT"
+
+      - name: Import APT signing key
+        env:
+          APT_GPG_PRIVATE_KEY_BASE64: ${{ secrets.APT_GPG_PRIVATE_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          : "${APT_GPG_PRIVATE_KEY_BASE64:?APT_GPG_PRIVATE_KEY_BASE64 secret is required}"
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "$APT_GPG_PRIVATE_KEY_BASE64" | base64 -d | gpg --batch --import
+
+      - name: Build archive keyring package
+        id: keyring
+        env:
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+          APT_GPG_PUBLIC_KEYS_BASE64: ${{ secrets.APT_GPG_PUBLIC_KEYS_BASE64 }}
+          DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
+        run: |
+          set -euo pipefail
+          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID secret is required}"
+
+          if [ -n "$APT_GPG_PUBLIC_KEYS_BASE64" ]; then
+            echo "$APT_GPG_PUBLIC_KEYS_BASE64" | base64 -d > apt-public-keys.asc
+          else
+            gpg --batch --yes --armor --export "$APT_GPG_KEY_ID" > apt-public-keys.asc
+          fi
+
+          gpg --batch --yes --dearmor -o buildio-archive-keyring.gpg apt-public-keys.asc
+
+          PACKAGE_ROOT="pkg/buildio-archive-keyring_${DEB_VERSION}_all"
+          rm -rf "$PACKAGE_ROOT"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN"
+          mkdir -p "$PACKAGE_ROOT/usr/share/keyrings"
+          mkdir -p "$PACKAGE_ROOT/usr/share/doc/buildio-archive-keyring"
+
+          install -m 0644 buildio-archive-keyring.gpg "$PACKAGE_ROOT/usr/share/keyrings/buildio-archive-keyring.gpg"
+          sed "s/@DEB_VERSION@/${DEB_VERSION}/g" packaging/deb/keyring-control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
+          install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/buildio-archive-keyring/copyright"
+
+          dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "buildio-archive-keyring_${DEB_VERSION}_all.deb"
+
+          echo "keyring_deb_path=buildio-archive-keyring_${DEB_VERSION}_all.deb" >> "$GITHUB_OUTPUT"
+          echo "public_keys_path=apt-public-keys.asc" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Debian packages
+        env:
+          DEB_PATH: ${{ steps.deb.outputs.deb_path }}
+          KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
+        run: |
+          set -euo pipefail
+          dpkg-deb --info "$DEB_PATH"
+          dpkg-deb --contents "$DEB_PATH"
+          dpkg-deb --info "$KEYRING_DEB_PATH"
+          dpkg-deb --contents "$KEYRING_DEB_PATH"
+
+      - name: Publish APT repository
+        env:
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          DEB_PATH: ${{ steps.deb.outputs.deb_path }}
+          DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
+          KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
+          PUBLIC_KEYS_PATH: ${{ steps.keyring.outputs.public_keys_path }}
+        run: |
+          set -euo pipefail
+          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID secret is required}"
+          : "${APT_GPG_PASSPHRASE:?APT_GPG_PASSPHRASE secret is required}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          rm -rf public-pages existing-debs
+          mkdir -p existing-debs
+
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add public-pages origin/gh-pages
+          else
+            git worktree add --detach public-pages
+            git -C public-pages checkout --orphan gh-pages
+            git -C public-pages rm -rf . || true
+          fi
+
+          shopt -s nullglob globstar
+          old_debs=(public-pages/apt/pool/**/*.deb)
+          if ((${#old_debs[@]})); then
+            cp "${old_debs[@]}" existing-debs/
+          fi
+          cp "$DEB_PATH" existing-debs/
+          cp "$KEYRING_DEB_PATH" existing-debs/
+
+          APTLY_ROOT="$RUNNER_TEMP/aptly"
+          rm -rf "$APTLY_ROOT"
+          PASSPHRASE_FILE="$RUNNER_TEMP/apt-gpg-passphrase"
+          printf '%s' "$APT_GPG_PASSPHRASE" > "$PASSPHRASE_FILE"
+          chmod 600 "$PASSPHRASE_FILE"
+          aptly -rootDir="$APTLY_ROOT" repo create -distribution=stable -component=main bld
+          aptly -rootDir="$APTLY_ROOT" repo add -force-replace bld existing-debs
+          aptly -rootDir="$APTLY_ROOT" publish repo \
+            -batch \
+            -distribution=stable \
+            -component=main \
+            -architectures=amd64,all \
+            -gpg-key="$APT_GPG_KEY_ID" \
+            -passphrase-file="$PASSPHRASE_FILE" \
+            -origin="Build.io" \
+            -label="Build.io CLI" \
+            bld apt
+
+          cp "$PUBLIC_KEYS_PATH" "$APTLY_ROOT/public/apt/gpg.key"
+
+          rm -rf public-pages/apt
+          cp -a "$APTLY_ROOT/public/apt" public-pages/apt
+          install -m 0755 packaging/apt/install.sh public-pages/install.sh
+          touch public-pages/.nojekyll
+
+          git -C public-pages add apt install.sh .nojekyll
+          git -C public-pages commit -m "Publish APT package ${DEB_VERSION}" || true
+          git -C public-pages push origin HEAD:gh-pages
+
+      - name: Build release body
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > release-body.md
+          from pathlib import Path
+          import os
+          import sys
+
+          readme = Path("README.md").read_text()
+          lines = readme.splitlines()
+
+          start = next((i for i, line in enumerate(lines) if line == "## Install"), None)
+          if start is None:
+              sys.exit("README.md is missing a ## Install section")
+
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+          install = "\n".join(lines[start:end]).strip()
+          if not install:
+              sys.exit("README.md ## Install section is empty")
+
+          print(f"Release of version {os.environ['VERSION']}")
+          print()
+          print(install)
+          PY
+
       - name: Create or update release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.get_version.outputs.VERSION }}
           name: Release v${{ steps.get_version.outputs.VERSION }}
-          body: |
-            Release of version ${{ steps.get_version.outputs.VERSION }}
-
-            ## Linux Binary
-            Download the Linux AMD64 binary from the assets below.
-
-            ### Installation (Linux)
-            ```bash
-            # Download and extract
-            curl -L -o bld-linux-amd64.zip https://github.com/buildio/cli/releases/download/v${{ steps.get_version.outputs.VERSION }}/bld-linux-amd64.zip
-            unzip bld-linux-amd64.zip
-            chmod +x bld
-            sudo mv bld /usr/local/bin/
-            ```
-
-            ## Windows Binary
-            Download the Windows AMD64 binary from the assets below.
-
-            ### Installation (Windows)
-            ```powershell
-            # Download and extract
-            Invoke-WebRequest -Uri "https://github.com/buildio/cli/releases/download/v${{ steps.get_version.outputs.VERSION }}/bld-windows-amd64.zip" -OutFile "bld-windows-amd64.zip"
-            Expand-Archive -Path bld-windows-amd64.zip -DestinationPath .
-
-            # Move to a directory in your PATH (example: C:\Program Files\bld)
-            # Or add the current directory to your PATH
-            ```
+          body_path: release-body.md
           files: |
             bin/linux-amd64/bld-linux-amd64.zip
+            ${{ steps.deb.outputs.deb_path }}
+            ${{ steps.keyring.outputs.keyring_deb_path }}
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
