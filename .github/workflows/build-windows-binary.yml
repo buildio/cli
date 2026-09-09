@@ -21,6 +21,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+      - name: Setup MSYS2 UCRT64
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: git
+          pacboy: >-
+            crystal:p
+            shards:p
+            libssh2:p
+            ntldd:p
+
 
       - name: Install Crystal
         run: |
@@ -67,6 +80,24 @@ jobs:
             Copy-Item -Path $source.FullName -Destination "bin/windows-amd64/$dll" -Force
           }
         shell: powershell
+      - name: Build MinGW Windows binary
+        run: |
+          shards install --production
+          mkdir -p bin/windows-amd64-mingw
+          crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64-mingw/bld.exe
+        shell: msys2 {0}
+
+      - name: Copy MinGW runtime DLLs
+        run: |
+          build_dir=bin/windows-amd64-mingw
+          ntldd -R "$build_dir/bld.exe" |
+            sed -n 's/.*=> \(\/ucrt64\/bin\/[^ ]*\.dll\).*/\1/p' |
+            sort -u |
+            while IFS= read -r dll; do
+              cp "$dll" "$build_dir/"
+            done
+        shell: msys2 {0}
+
       - name: Get version
         id: get_version
         run: |
@@ -78,31 +109,27 @@ jobs:
           }
         shell: powershell
 
-      - name: Create release zip
+      - name: Create release zips
         run: |
           Compress-Archive -Path bin/windows-amd64/* -DestinationPath bin/windows-amd64/bld-windows-amd64.zip
+          Compress-Archive -Path bin/windows-amd64-mingw/* -DestinationPath bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip
         shell: powershell
 
-      - name: Smoke test release zip
+      - name: Smoke test release zips
         run: |
           $ErrorActionPreference = "Stop"
-          $smokeDir = Join-Path $env:RUNNER_TEMP "bld-smoke"
-          Remove-Item -Recurse -Force $smokeDir -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
-          Expand-Archive -Path bin/windows-amd64/bld-windows-amd64.zip -DestinationPath $smokeDir
-
           $oldPath = $env:PATH
           $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
           $env:BUILD_NO_UPDATE_CHECK = "1"
 
           function Invoke-BldSmoke {
-            param([string[]]$Arguments)
+            param([string]$SmokeDir, [string[]]$Arguments)
 
             $stdout = Join-Path $env:RUNNER_TEMP "$([Guid]::NewGuid()).out"
             $stderr = Join-Path $env:RUNNER_TEMP "$([Guid]::NewGuid()).err"
 
             try {
-              $process = Start-Process -FilePath "$smokeDir\bld.exe" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+              $process = Start-Process -FilePath "$SmokeDir\bld.exe" -ArgumentList $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
               $stdoutText = if (Test-Path $stdout) { Get-Content -Path $stdout -Raw -ErrorAction SilentlyContinue } else { "" }
               $stderrText = if (Test-Path $stderr) { Get-Content -Path $stderr -Raw -ErrorAction SilentlyContinue } else { "" }
 
@@ -116,12 +143,24 @@ jobs:
           }
 
           try {
-            $help = Invoke-BldSmoke @("--help")
-            if ($help.ExitCode -ne 0) {
-              throw "bld.exe --help exited with $($help.ExitCode)`n$($help.Output)"
-            }
-            if ($help.Output -notmatch "Usage:") {
-              throw "bld.exe --help produced no usage output`n$($help.Output)"
+            $zips = @(
+              "bin/windows-amd64/bld-windows-amd64.zip",
+              "bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip"
+            )
+
+            foreach ($zip in $zips) {
+              $smokeDir = Join-Path $env:RUNNER_TEMP "bld-smoke-$([IO.Path]::GetFileNameWithoutExtension($zip))"
+              Remove-Item -Recurse -Force $smokeDir -ErrorAction SilentlyContinue
+              New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+              Expand-Archive -Path $zip -DestinationPath $smokeDir
+
+              $help = Invoke-BldSmoke $smokeDir @("--help")
+              if ($help.ExitCode -ne 0) {
+                throw "$zip bld.exe --help exited with $($help.ExitCode)`n$($help.Output)"
+              }
+              if ($help.Output -notmatch "Usage:") {
+                throw "$zip bld.exe --help produced no usage output`n$($help.Output)"
+              }
             }
           } finally {
             $env:PATH = $oldPath
@@ -135,6 +174,7 @@ jobs:
           tag_name: v${{ steps.get_version.outputs.VERSION }}
           files: |
             bin/windows-amd64/bld-windows-amd64.zip
+            bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
@@ -146,9 +186,9 @@ jobs:
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          $hash = (Get-FileHash -Algorithm SHA256 bin/windows-amd64/bld-windows-amd64.zip).Hash.ToLowerInvariant()
+          $hash = (Get-FileHash -Algorithm SHA256 bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip).Hash.ToLowerInvariant()
           $manifestPath = "bucket/bld.json"
-          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64.zip"
+          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64-mingw.zip"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
