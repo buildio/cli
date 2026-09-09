@@ -32,6 +32,7 @@ jobs:
             crystal:p
             shards:p
             libssh2:p
+            pkgconf:p
             ntldd:p
 
 
