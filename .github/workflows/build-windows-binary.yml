@@ -21,8 +21,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - name: Setup MSYS2 UCRT64
-        id: msys2
+      - name: Setup MinGW UCRT64 toolchain
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -34,63 +33,16 @@ jobs:
             libssh2:p
             pkgconf:p
             ntldd:p
-
-
-      - name: Install Crystal
-        run: |
-          iwr -useb get.scoop.sh -outfile 'install-scoop.ps1'
-          .\install-scoop.ps1 -RunAsAdmin
-          scoop install crystal
-          echo "$HOME\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          crystal --version
-          shards --version
-        shell: powershell
-
-      - name: Install dependencies
-        run: |
-          shards install --production
-        shell: powershell
-
-      - name: Build Windows binary
-        run: |
-          New-Item -ItemType Directory -Force -Path bin/windows-amd64
-          crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64/bld.exe
-        shell: powershell
-
-      - name: Copy runtime DLLs
-        run: |
-          $ErrorActionPreference = "Stop"
-          $crystalRoot = (& scoop prefix crystal).Trim()
-          $runtimeDlls = @(
-            "gc.dll",
-            "iconv-2.dll",
-            "libcrypto-3-x64.dll",
-            "libssl-3-x64.dll",
-            "mpir.dll",
-            "pcre2-8.dll",
-            "yaml.dll",
-            "zlib1.dll"
-          )
-
-          foreach ($dll in $runtimeDlls) {
-            $source = Get-ChildItem -Path $crystalRoot -Recurse -Filter $dll -File | Select-Object -First 1
-            if (-not $source) {
-              throw "Could not find Crystal runtime DLL '$dll' under '$crystalRoot'."
-            }
-
-            Copy-Item -Path $source.FullName -Destination "bin/windows-amd64/$dll" -Force
-          }
-        shell: powershell
       - name: Build MinGW Windows binary
         run: |
           shards install --production
-          mkdir -p bin/windows-amd64-mingw
-          crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64-mingw/bld.exe
+          mkdir -p bin/windows-amd64
+          crystal build src/build_cli.cr --release --no-debug -o bin/windows-amd64/bld.exe
         shell: msys2 {0}
 
       - name: Copy MinGW runtime DLLs
         run: |
-          build_dir=bin/windows-amd64-mingw
+          build_dir=bin/windows-amd64
           dll_count=0
           while IFS= read -r dll; do
             dll_path=$(cygpath -u "$dll")
@@ -129,7 +81,6 @@ jobs:
       - name: Create release zips
         run: |
           Compress-Archive -Path bin/windows-amd64/* -DestinationPath bin/windows-amd64/bld-windows-amd64.zip
-          Compress-Archive -Path bin/windows-amd64-mingw/* -DestinationPath bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip
         shell: powershell
 
       - name: Smoke test release zips
@@ -161,8 +112,7 @@ jobs:
 
           try {
             $zips = @(
-              "bin/windows-amd64/bld-windows-amd64.zip",
-              "bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip"
+              "bin/windows-amd64/bld-windows-amd64.zip"
             )
 
             foreach ($zip in $zips) {
@@ -191,7 +141,6 @@ jobs:
           tag_name: v${{ steps.get_version.outputs.VERSION }}
           files: |
             bin/windows-amd64/bld-windows-amd64.zip
-            bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
@@ -203,9 +152,9 @@ jobs:
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          $hash = (Get-FileHash -Algorithm SHA256 bin/windows-amd64-mingw/bld-windows-amd64-mingw.zip).Hash.ToLowerInvariant()
+          $hash = (Get-FileHash -Algorithm SHA256 bin/windows-amd64/bld-windows-amd64.zip).Hash.ToLowerInvariant()
           $manifestPath = "bucket/bld.json"
-          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64-mingw.zip"
+          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64.zip"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
