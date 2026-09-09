@@ -91,12 +91,28 @@ jobs:
       - name: Copy MinGW runtime DLLs
         run: |
           build_dir=bin/windows-amd64-mingw
-          ntldd -R "$build_dir/bld.exe" |
-            sed -n 's/.*=> \(\/ucrt64\/bin\/[^ ]*\.dll\).*/\1/p' |
-            sort -u |
-            while IFS= read -r dll; do
-              cp "$dll" "$build_dir/"
-            done
+          dll_count=0
+          while IFS= read -r dll; do
+            dll_path=$(cygpath -u "$dll")
+            case "$dll_path" in
+              "$MINGW_PREFIX"/bin/*.dll)
+                cp "$dll_path" "$build_dir/"
+                dll_count=$((dll_count + 1))
+                ;;
+            esac
+          done < <(
+            ntldd -R "$build_dir/bld.exe" |
+              sed -n 's/.*=> \(.*\.dll\).*/\1/p' |
+              sort -u
+          )
+
+          if [ "$dll_count" -eq 0 ]; then
+            echo "ntldd found no MinGW runtime DLLs for $build_dir/bld.exe" >&2
+            ntldd -R "$build_dir/bld.exe" >&2
+            exit 1
+          fi
+
+          BUILD_NO_UPDATE_CHECK=1 PATH="$PWD/$build_dir:/c/Windows/System32:/c/Windows" "$build_dir/bld.exe" --help > /dev/null
         shell: msys2 {0}
 
       - name: Get version
