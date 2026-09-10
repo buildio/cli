@@ -90,7 +90,7 @@ jobs:
             KEY_ID="$(gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
           else
             if [ -z "$GH_TOKEN" ]; then
-              echo "::error::APT_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Run locally to open GitHub's prefilled fine-grained PAT form, paste the generated token, and store it as the persistent bootstrap secret for key bootstrap/rotation: open 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo $GITHUB_REPOSITORY --body \"\$APT_SECRET_BOOTSTRAP_TOKEN\""
+              echo "::error::APT_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Run locally to open GitHub's prefilled fine-grained PAT form, select only the buildio/cli repository, paste the generated token, and store it as the persistent bootstrap secret for key bootstrap/rotation: open 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo $GITHUB_REPOSITORY --body \"\$APT_SECRET_BOOTSTRAP_TOKEN\""
               exit 1
             fi
 
