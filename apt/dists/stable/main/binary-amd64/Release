@@ -1,0 +1,6 @@
+Origin: Build.io
+Label: Build.io CLI
+Archive: stable
+Suite: stable
+Architecture: amd64
+Component: main
