@@ -3,6 +3,24 @@ Priority: optional
 Section: utils
 Maintainer: Build.io <support@build.io>
 Architecture: amd64
+Version: 1.1.106-1
+Depends: ca-certificates
+Recommends: buildio-archive-keyring
+Filename: pool/main/b/bld/bld_1.1.106-1_amd64.deb
+Size: 3242134
+MD5sum: c51044355349db55df849baf0830593d
+SHA1: 941d0c1d6ce9bede71ec0cec6b82acd1b4603b4d
+SHA256: 2031eab42a1e3ae14d5e98e8fbef2d05b169ade7c70dded6615c43a210c21057
+SHA512: ad334cff01965cedd589c27b3ab24968f528badf03443655d12d7b1d107e35b2f782bca2f764afbf13184eeb6408bcf3598c59f5aba6e7e70aea46d3c28bd4b2
+Description: Build.io command-line client
+ Heroku-compatible command-line client for Build.io.
+Homepage: https://app.build.io
+
+Package: bld
+Priority: optional
+Section: utils
+Maintainer: Build.io <support@build.io>
+Architecture: amd64
 Version: 1.1.105-1
 Depends: ca-certificates
 Recommends: buildio-archive-keyring
@@ -14,6 +32,22 @@ SHA256: f419908d401c63f333cb766ab17b13cd5c5552f726c4824e8effc3382e5a27fc
 SHA512: a5345a174c12798bf2e4ab201fde975298e02aaf3c4ccfac2584f5e5daa1b31563426552b11ee0dfe1e0b95477e0514ef8276a0f73d65b489bf5c7c8cebfefe9
 Description: Build.io command-line client
  Heroku-compatible command-line client for Build.io.
+Homepage: https://app.build.io
+
+Package: buildio-archive-keyring
+Priority: optional
+Section: misc
+Maintainer: Build.io <support@build.io>
+Architecture: all
+Version: 1.1.106-1
+Filename: pool/main/b/buildio-archive-keyring/buildio-archive-keyring_1.1.106-1_all.deb
+Size: 2782
+MD5sum: 9fe9dbfda2a43333f15b59a263b08d33
+SHA1: 1d82f3e8b6e8675b81059c62f79b1c0f096ac469
+SHA256: 14c482a9b87a2f6775c71b1c2e0846d6dd93aeb3077db02e0edbd718098706a8
+SHA512: 3331305da09667249d4db6ed7814f067decffaffdaf6508ad4029885effc554826fca8c3fc5fff24e9bad3755fa573b1b66aa03c73f7ccf7ddff919d6593b1f5
+Description: Build.io APT archive signing keyring
+ Public signing keys used by the Build.io CLI APT repository.
 Homepage: https://app.build.io
 
 Package: buildio-archive-keyring
