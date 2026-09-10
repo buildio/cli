@@ -217,6 +217,30 @@ jobs:
 
           APTLY_ROOT="$RUNNER_TEMP/aptly"
           rm -rf "$APTLY_ROOT"
+          APTLY_CONFIG="$RUNNER_TEMP/aptly.conf"
+          cat > "$APTLY_CONFIG" <<EOF
+          {
+            "rootDir": "$APTLY_ROOT",
+            "downloadConcurrency": 4,
+            "downloadSpeedLimit": 0,
+            "architectures": [],
+            "dependencyFollowSuggests": false,
+            "dependencyFollowRecommends": false,
+            "dependencyFollowAllVariants": false,
+            "dependencyFollowSource": false,
+            "dependencyVerboseResolve": false,
+            "gpgDisableSign": false,
+            "gpgDisableVerify": false,
+            "gpgProvider": "gpg",
+            "downloadSourcePackages": false,
+            "skipLegacyPool": true,
+            "ppaDistributorID": "ubuntu",
+            "ppaCodename": "",
+            "FileSystemPublishEndpoints": {},
+            "S3PublishEndpoints": {},
+            "SwiftPublishEndpoints": {}
+          }
+          EOF
           PUBLISH_ARGS=(
             -batch
             -distribution=stable
@@ -227,9 +251,9 @@ jobs:
             -label="Build.io CLI"
           )
 
-          aptly -rootDir="$APTLY_ROOT" repo create -distribution=stable -component=main bld
-          aptly -rootDir="$APTLY_ROOT" repo add -force-replace bld existing-debs
-          aptly -rootDir="$APTLY_ROOT" publish repo "${PUBLISH_ARGS[@]}" bld apt
+          aptly -config="$APTLY_CONFIG" repo create -distribution=stable -component=main bld
+          aptly -config="$APTLY_CONFIG" repo add -force-replace bld existing-debs
+          aptly -config="$APTLY_CONFIG" publish repo "${PUBLISH_ARGS[@]}" bld apt
 
           cp "$PUBLIC_KEYS_PATH" "$APTLY_ROOT/public/apt/gpg.key"
 
