@@ -74,25 +74,79 @@ jobs:
           echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
           echo "deb_path=bld_${DEB_VERSION}_amd64.deb" >> "$GITHUB_OUTPUT"
 
-      - name: Import APT signing key
+      - name: Prepare APT signing key
+        id: signing
         env:
           APT_GPG_PRIVATE_KEY_BASE64: ${{ secrets.APT_GPG_PRIVATE_KEY_BASE64 }}
+          APT_GPG_PUBLIC_KEYS_BASE64: ${{ vars.APT_GPG_PUBLIC_KEYS_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
         run: |
           set -euo pipefail
-          : "${APT_GPG_PRIVATE_KEY_BASE64:?APT_GPG_PRIVATE_KEY_BASE64 secret is required}"
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
-          echo "$APT_GPG_PRIVATE_KEY_BASE64" | base64 -d | gpg --batch --import
+
+          if [ -n "$APT_GPG_PRIVATE_KEY_BASE64" ]; then
+            echo "$APT_GPG_PRIVATE_KEY_BASE64" | base64 -d | gpg --batch --import
+            KEY_ID="$(gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::APT_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Run locally to open GitHub's prefilled fine-grained PAT form, paste the generated token, and store it as the persistent bootstrap secret for key bootstrap/rotation: gh browse 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo $GITHUB_REPOSITORY --body \"\$APT_SECRET_BOOTSTRAP_TOKEN\""
+              exit 1
+            fi
+
+            cat > "$RUNNER_TEMP/apt-gpg-batch" <<'EOF'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Key-Usage: sign
+          Name-Real: Build.io APT Repository
+          Name-Email: support@build.io
+          Expire-Date: 0
+          %commit
+          EOF
+
+            gpg --batch --generate-key "$RUNNER_TEMP/apt-gpg-batch"
+            KEY_ID="$(gpg --batch --with-colons --fingerprint --list-secret-keys "Build.io APT Repository <support@build.io>" | awk -F: '$1 == "fpr" {print $10; exit}')"
+
+            PRIVATE_KEY_BASE64="$(gpg --batch --yes --armor --export-secret-keys "$KEY_ID" | base64 | tr -d '\n')"
+            PUBLIC_KEYS_BASE64="$(gpg --batch --yes --armor --export "$KEY_ID" | base64 | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set APT_GPG_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new APT signing key for future releases."
+          fi
+
+          if [ -z "$KEY_ID" ]; then
+            echo "::error::Unable to determine the APT signing key fingerprint."
+            exit 1
+          fi
+
+          gpg --batch --list-secret-keys "$KEY_ID" >/dev/null
+
+          if [ -z "${PUBLIC_KEYS_BASE64:-}" ]; then
+            if [ -n "$APT_GPG_PUBLIC_KEYS_BASE64" ]; then
+              PUBLIC_KEYS_BASE64="$APT_GPG_PUBLIC_KEYS_BASE64"
+            else
+              PUBLIC_KEYS_BASE64="$(gpg --batch --yes --armor --export "$KEY_ID" | base64 | tr -d '\n')"
+            fi
+          fi
+
+          echo "key_id=$KEY_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "public_keys_base64<<EOF"
+            printf '%s\n' "$PUBLIC_KEYS_BASE64"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build archive keyring package
         id: keyring
         env:
-          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
-          APT_GPG_PUBLIC_KEYS_BASE64: ${{ secrets.APT_GPG_PUBLIC_KEYS_BASE64 }}
+          APT_GPG_KEY_ID: ${{ steps.signing.outputs.key_id }}
+          APT_GPG_PUBLIC_KEYS_BASE64: ${{ steps.signing.outputs.public_keys_base64 }}
           DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
         run: |
           set -euo pipefail
-          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID secret is required}"
+          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID is required}"
 
           if [ -n "$APT_GPG_PUBLIC_KEYS_BASE64" ]; then
             echo "$APT_GPG_PUBLIC_KEYS_BASE64" | base64 -d > apt-public-keys.asc
@@ -130,16 +184,14 @@ jobs:
 
       - name: Publish APT repository
         env:
-          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
-          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          APT_GPG_KEY_ID: ${{ steps.signing.outputs.key_id }}
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
           DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
           KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
           PUBLIC_KEYS_PATH: ${{ steps.keyring.outputs.public_keys_path }}
         run: |
           set -euo pipefail
-          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID secret is required}"
-          : "${APT_GPG_PASSPHRASE:?APT_GPG_PASSPHRASE secret is required}"
+          : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID is required}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -165,21 +217,19 @@ jobs:
 
           APTLY_ROOT="$RUNNER_TEMP/aptly"
           rm -rf "$APTLY_ROOT"
-          PASSPHRASE_FILE="$RUNNER_TEMP/apt-gpg-passphrase"
-          printf '%s' "$APT_GPG_PASSPHRASE" > "$PASSPHRASE_FILE"
-          chmod 600 "$PASSPHRASE_FILE"
+          PUBLISH_ARGS=(
+            -batch
+            -distribution=stable
+            -component=main
+            -architectures=amd64,all
+            -gpg-key="$APT_GPG_KEY_ID"
+            -origin="Build.io"
+            -label="Build.io CLI"
+          )
+
           aptly -rootDir="$APTLY_ROOT" repo create -distribution=stable -component=main bld
           aptly -rootDir="$APTLY_ROOT" repo add -force-replace bld existing-debs
-          aptly -rootDir="$APTLY_ROOT" publish repo \
-            -batch \
-            -distribution=stable \
-            -component=main \
-            -architectures=amd64,all \
-            -gpg-key="$APT_GPG_KEY_ID" \
-            -passphrase-file="$PASSPHRASE_FILE" \
-            -origin="Build.io" \
-            -label="Build.io CLI" \
-            bld apt
+          aptly -rootDir="$APTLY_ROOT" publish repo "${PUBLISH_ARGS[@]}" bld apt
 
           cp "$PUBLIC_KEYS_PATH" "$APTLY_ROOT/public/apt/gpg.key"
 
