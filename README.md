@@ -23,17 +23,10 @@ curl -fsSL https://buildio.github.io/cli/install.sh | sh
 Manual APT setup without `curl | sh`:
 
 ```bash
-[ "$(dpkg --print-architecture)" = amd64 ] || { echo "Build.io CLI APT packages currently support amd64." >&2; exit 1; }
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
-version="$(curl -fsSL https://api.github.com/repos/buildio/cli/releases/latest | sed -n 's/.*"tag_name": "v\([^"]*\)".*/\1/p')"
-curl -fsSL https://buildio.github.io/cli/apt/gpg.key -o "$tmpdir/buildio-archive-keyring.asc"
-gpg --batch --yes --dearmor -o "$tmpdir/buildio-archive-keyring.gpg" "$tmpdir/buildio-archive-keyring.asc"
-sudo install -m 0644 "$tmpdir/buildio-archive-keyring.gpg" /usr/share/keyrings/buildio-archive-keyring.gpg
+curl -fsSL https://buildio.github.io/cli/apt/gpg.key | gpg --batch --yes --dearmor | sudo tee /usr/share/keyrings/buildio-archive-keyring.gpg >/dev/null
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg] https://buildio.github.io/cli/apt stable main" | sudo tee /etc/apt/sources.list.d/buildio-cli.list >/dev/null
-curl -fL "https://github.com/buildio/cli/releases/download/v${version}/buildio-archive-keyring_${version}-1_all.deb" -o "$tmpdir/buildio-archive-keyring.deb"
-curl -fL "https://github.com/buildio/cli/releases/download/v${version}/bld_${version}-1_amd64.deb" -o "$tmpdir/bld.deb"
-sudo apt-get install -y "$tmpdir/buildio-archive-keyring.deb" "$tmpdir/bld.deb"
+sudo apt-get update -o Dir::Etc::sourcelist="sources.list.d/buildio-cli.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+sudo apt-get install -y buildio-archive-keyring bld
 ```
 
 
