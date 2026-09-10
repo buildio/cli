@@ -20,6 +20,16 @@ scoop install bld
 curl -fsSL https://buildio.github.io/cli/install.sh | sh
 ```
 
+Manual APT setup without `curl | sh`:
+
+```bash
+curl -fsSL https://buildio.github.io/cli/apt/gpg.key | gpg --batch --yes --dearmor | sudo tee /usr/share/keyrings/buildio-archive-keyring.gpg >/dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg] https://buildio.github.io/cli/apt stable main" | sudo tee /etc/apt/sources.list.d/buildio-cli.list >/dev/null
+sudo apt-get update -o Dir::Etc::sourcelist="sources.list.d/buildio-cli.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+sudo apt-get install -y buildio-archive-keyring bld
+```
+
+
 If you previously installed `bld` manually into `/usr/local/bin`, remove that copy or ensure `/usr/bin` appears first in `PATH`; otherwise the manual binary can shadow the APT package.
 
 ## Build
@@ -49,6 +59,15 @@ git push origin v1.1.7
 ```
 
 APT publishing needs a stable GPG signing key because users' `apt` clients trust the repository through `/usr/share/keyrings/buildio-archive-keyring.gpg`. The workflow bootstraps that key automatically when `APT_GPG_PRIVATE_KEY_BASE64` is missing: it generates a repository signing key, uses it for the current publish, and saves `APT_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The signing key ID is derived from the imported private key on each run, so there is no separate key-id secret. The public key bundle is derived from the signing key by default; set the repository variable `APT_GPG_PUBLIC_KEYS_BASE64` only when planned rotation needs an old+new armored public-key bundle. Keeping `APT_SECRET_BOOTSTRAP_TOKEN` lets the workflow update APT signing secrets during future bootstrap/rotation work without another manual token handoff. To seed it, open GitHub's official fine-grained PAT form with prefilled owner/expiration/permission fields, select only the `buildio/cli` repository manually, generate the token, paste it into the prompt, and store it with `open 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo buildio/cli --body "$APT_SECRET_BOOTSTRAP_TOKEN"`. GitHub documents `target_name` as the resource owner, not as a selected repository, so the repository selection remains manual. The `buildio-archive-keyring` package owns `/usr/share/keyrings/buildio-archive-keyring.gpg`, so publish old+new public keys while the old key still signs the repository, let users update, then switch the private-key secret to the new signing key.
+
+The workflow generates the published `install.sh` from the manual APT setup code block above, so that block is the single source of truth for both install paths.
+
+If the workflow publishes `gh-pages` but `https://buildio.github.io/cli/install.sh` returns 404, enable GitHub Pages from the `gh-pages` branch root:
+
+```bash
+gh api --method POST repos/buildio/cli/pages -f source[branch]=gh-pages -f source[path]=/
+```
+
 
 ## Using a Custom API URL
 

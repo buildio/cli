@@ -259,7 +259,30 @@ jobs:
 
           rm -rf public-pages/apt
           cp -a "$APTLY_ROOT/public/apt" public-pages/apt
-          install -m 0755 packaging/apt/install.sh public-pages/install.sh
+          python3 - <<'PY' > public-pages/install.sh
+          from pathlib import Path
+          import sys
+
+          lines = Path("README.md").read_text().splitlines()
+          marker = next((i for i, line in enumerate(lines) if line == "Manual APT setup without `curl | sh`:"), None)
+          if marker is None:
+              sys.exit("README.md is missing the manual APT setup section")
+
+          start = next((i for i in range(marker + 1, len(lines)) if lines[i] == "```bash"), None)
+          if start is None:
+              sys.exit("README.md manual APT setup section is missing a bash code block")
+
+          end = next((i for i in range(start + 1, len(lines)) if lines[i] == "```"), None)
+          if end is None:
+              sys.exit("README.md manual APT setup section has an unterminated code block")
+
+          install_script = "\n".join(lines[start + 1:end]).strip()
+          if not install_script:
+              sys.exit("README.md manual APT setup section is empty")
+
+          print(install_script)
+          PY
+          chmod 0755 public-pages/install.sh
           touch public-pages/.nojekyll
 
           git -C public-pages add apt install.sh .nojekyll
