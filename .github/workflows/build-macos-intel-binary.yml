@@ -1,0 +1,81 @@
+name: Build macOS Intel Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.1.6)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-intel-binary:
+    runs-on: macos-15-intel
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+
+      - name: Install native dependencies
+        run: |
+          brew install libssh2 pkg-config
+
+      - name: Build macOS Intel binary
+        run: |
+          set -euo pipefail
+          shards install --production
+          mkdir -p bin/darwin-amd64
+          crystal build src/build_cli.cr --release --no-debug -o bin/darwin-amd64/bld
+          strip bin/darwin-amd64/bld
+          BUILD_NO_UPDATE_CHECK=1 bin/darwin-amd64/bld --help > /dev/null
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release zip
+        run: |
+          cd bin/darwin-amd64
+          zip -j bld-darwin-amd64.zip bld
+
+      - name: Smoke test release zip
+        run: |
+          set -euo pipefail
+
+          smoke_dir="$RUNNER_TEMP/bld-smoke-darwin-amd64"
+          rm -rf "$smoke_dir"
+          mkdir -p "$smoke_dir"
+          unzip -q bin/darwin-amd64/bld-darwin-amd64.zip -d "$smoke_dir"
+
+          output="$(BUILD_NO_UPDATE_CHECK=1 "$smoke_dir/bld" --help 2>&1)"
+          if ! printf '%s' "$output" | grep -q "Usage:"; then
+            printf '%s\n' "$output" >&2
+            echo "bld --help produced no usage output" >&2
+            exit 1
+          fi
+
+      - name: Upload macOS Intel binary to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          files: |
+            bin/darwin-amd64/bld-darwin-amd64.zip
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
