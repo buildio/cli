@@ -281,61 +281,141 @@ jobs:
       - name: Publish Chocolatey repository
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+          # Check whether gh-pages already exists.
+          git ls-remote --exit-code --heads origin gh-pages *> $null
+
+          if ($LASTEXITCODE -eq 0) {
             git fetch origin gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to fetch gh-pages"
+            }
+
             git worktree add public-pages origin/gh-pages
-          else
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create gh-pages worktree"
+            }
+          }
+          else {
             git worktree add --detach public-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create detached worktree"
+            }
+
             git -C public-pages checkout --orphan gh-pages
-            git -C public-pages rm -rf . || true
-          fi
 
-          CHOCOLATEY_PACKAGES="$RUNNER_TEMP/chocolatey-packages"
-          rm -rf "$CHOCOLATEY_PACKAGES"
-          mkdir -p "$CHOCOLATEY_PACKAGES"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create orphan gh-pages branch"
+            }
 
-          dotnet pack chocolatey/bld.nuspec \
-            --output "$CHOCOLATEY_PACKAGES"
+            git -C public-pages rm -rf . 2>$null
 
-          NUPKG_PATH="$CHOCOLATEY_PACKAGES/bld.${VERSION}.nupkg"
+            # git rm may return non-zero when there's nothing to remove.
+            $global:LASTEXITCODE = 0
+          }
 
-          test -f "$NUPKG_PATH"
+          $chocolateyPackages = Join-Path $env:RUNNER_TEMP "chocolatey-packages"
 
-          SLEET_TOOLS="$RUNNER_TEMP/sleet-tools"
-          rm -rf "$SLEET_TOOLS"
+          if (Test-Path $chocolateyPackages) {
+            Remove-Item -Recurse -Force $chocolateyPackages
+          }
 
-          dotnet tool install \
-            --tool-path "$SLEET_TOOLS" \
-            sleet \
+          New-Item -ItemType Directory -Force -Path $chocolateyPackages | Out-Null
+
+          dotnet pack chocolatey/bld.nuspec `
+            --version $env:VERSION `
+            --output $chocolateyPackages
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet pack failed"
+          }
+
+          $nupkgPath = Join-Path $chocolateyPackages "bld.$($env:VERSION).nupkg"
+
+          if (-not (Test-Path $nupkgPath)) {
+            throw "Chocolatey package was not created: $nupkgPath"
+          }
+
+          $sleetTools = Join-Path $env:RUNNER_TEMP "sleet-tools"
+
+          if (Test-Path $sleetTools) {
+            Remove-Item -Recurse -Force $sleetTools
+          }
+
+          dotnet tool install `
+            --tool-path $sleetTools `
+            sleet `
             --version 7.2.0
 
-          SLEET_CONFIG="$RUNNER_TEMP/sleet.json"
-
-          cat > "$SLEET_CONFIG" <<EOF
-          {
-            "username": "github-actions[bot]",
-            "useremail": "github-actions[bot]@users.noreply.github.com",
-            "sources": [
-              {
-                "name": "buildio",
-                "type": "local",
-                "path": "$GITHUB_WORKSPACE/public-pages/chocolatey",
-                "baseURI": "https://buildio.github.io/cli/chocolatey/"
-              }
-            ]
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install Sleet"
           }
-          EOF
 
-          "$SLEET_TOOLS/sleet" push \
-            "$NUPKG_PATH" \
-            --config "$SLEET_CONFIG" \
+          $sleetConfig = Join-Path $env:RUNNER_TEMP "sleet.json"
+          $chocolateyFeedPath = Join-Path $env:GITHUB_WORKSPACE "public-pages/chocolatey"
+
+          $config = @{
+            username = "github-actions[bot]"
+            useremail = "github-actions[bot]@users.noreply.github.com"
+            sources = @(
+              @{
+                name = "buildio"
+                type = "local"
+                path = $chocolateyFeedPath
+                baseURI = "https://buildio.github.io/cli/chocolatey/"
+              }
+            )
+          }
+
+          $config |
+            ConvertTo-Json -Depth 10 |
+            Set-Content -Path $sleetConfig -Encoding utf8
+
+          if ($IsWindows) {
+            $sleet = Join-Path $sleetTools "sleet.exe"
+          }
+          else {
+            $sleet = Join-Path $sleetTools "sleet"
+          }
+
+          & $sleet push `
+            $nupkgPath `
+            --config $sleetConfig `
             --source buildio
 
+          if ($LASTEXITCODE -ne 0) {
+            throw "Sleet push failed"
+          }
+
           git -C public-pages add chocolatey
-          git -C public-pages commit -m "Publish Chocolatey package ${VERSION}" || true
-          git -C public-pages push origin HEAD:gh-pages
+
+          git -C public-pages diff --cached --quiet
+
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Chocolatey repository already current."
+          }
+          elseif ($LASTEXITCODE -eq 1) {
+            git -C public-pages commit -m "Publish Chocolatey package $env:VERSION"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to commit Chocolatey repository"
+            }
+
+            git -C public-pages push origin HEAD:gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to push gh-pages"
+            }
+          }
+          else {
+            throw "git diff failed"
+          }
