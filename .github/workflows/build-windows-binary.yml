@@ -179,3 +179,98 @@ jobs:
             git push origin main
           }
         shell: pwsh
+
+      - name: Update Chocolatey manifest
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $zipPath = "bin/windows-amd64/bld-windows-amd64.zip"
+          $nuspecPath = "chocolatey/bld.nuspec"
+          $installScriptPath = "chocolatey/tools/chocolateyInstall.ps1"
+
+          $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64.zip"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Pick up the Scoop manifest commit from the previous step.
+          git fetch origin main
+          git checkout -B main origin/main
+
+          # Update the Chocolatey package version.
+          [xml]$nuspec = Get-Content -Path $nuspecPath -Raw
+          $nuspec.package.metadata.version = $env:VERSION
+          $resolvedNuspecPath = (Resolve-Path $nuspecPath).Path
+          $nuspec.Save($resolvedNuspecPath)
+
+          # Update chocolateyInstall.ps1.
+          $installScript = Get-Content -Path $installScriptPath -Raw
+
+          # Prefer the explicit 64-bit Chocolatey fields. Fall back to url/checksum
+          # if the package currently uses those instead.
+          $url64Pattern = "(?im)^(\s*url64(?:bit)?\s*=\s*)'[^']*'"
+          $urlPattern = "(?im)^(\s*url\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $url64Pattern)) {
+            $installScript = $installScript -replace `
+              $url64Pattern, `
+              ('$1' + "'$downloadUrl'")
+          } elseif ([regex]::IsMatch($installScript, $urlPattern)) {
+            $installScript = $installScript -replace `
+              $urlPattern, `
+              ('$1' + "'$downloadUrl'")
+          } else {
+            throw "Could not find url64/url64bit/url in $installScriptPath"
+          }
+
+          $checksum64Pattern = "(?im)^(\s*checksum64\s*=\s*)'[^']*'"
+          $checksumPattern = "(?im)^(\s*checksum\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $checksum64Pattern)) {
+            $installScript = $installScript -replace `
+              $checksum64Pattern, `
+              ('$1' + "'$hash'")
+          } elseif ([regex]::IsMatch($installScript, $checksumPattern)) {
+            $installScript = $installScript -replace `
+              $checksumPattern, `
+              ('$1' + "'$hash'")
+          } else {
+            throw "Could not find checksum64/checksum in $installScriptPath"
+          }
+
+          $checksumType64Pattern = "(?im)^(\s*checksumType64\s*=\s*)'[^']*'"
+          $checksumTypePattern = "(?im)^(\s*checksumType\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $checksumType64Pattern)) {
+            $installScript = $installScript -replace `
+              $checksumType64Pattern, `
+              ('$1' + "'sha256'")
+          } elseif ([regex]::IsMatch($installScript, $checksumTypePattern)) {
+            $installScript = $installScript -replace `
+              $checksumTypePattern, `
+              ('$1' + "'sha256'")
+          } else {
+            throw "Could not find checksumType64/checksumType in $installScriptPath"
+          }
+
+          Set-Content `
+            -Path $installScriptPath `
+            -Value $installScript `
+            -Encoding utf8 `
+            -NoNewline
+
+          git add $nuspecPath $installScriptPath
+
+          $changedFiles = git diff --cached --name-only
+
+          if (-not $changedFiles) {
+            Write-Host "Chocolatey manifest already current."
+          } else {
+            git commit -m "Update Chocolatey manifest to v$env:VERSION"
+            git push origin main
+          }
