@@ -22,7 +22,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 ```
 
 ```powershell
-choco source add --name=buildio --source="https://buildio.github.io/cli/chocolatey"
+choco source add --name=buildio --source="https://buildio.github.io/cli/chocolatey/index.json"
 choco install bld -y
 ```
 
