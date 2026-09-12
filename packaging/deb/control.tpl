@@ -8,4 +8,3 @@ Homepage: https://app.build.io
 Depends: ca-certificates
 Recommends: buildio-archive-keyring
 Description: Build.io command-line client
- Heroku-compatible command-line client for Build.io.
