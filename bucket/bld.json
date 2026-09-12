@@ -1,12 +1,12 @@
 {
-  "version": "1.1.110",
+  "version": "1.1.111",
   "description": "Command-line client for Build.io, a Heroku-compatible PaaS.",
   "homepage": "https://build.io",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/buildio/cli/releases/download/v1.1.110/bld-windows-amd64.zip",
-      "hash": "78c42ef62e9527ad59be6c7247301799896c2bcad5d67e575c8a979eea196e6b"
+      "url": "https://github.com/buildio/cli/releases/download/v1.1.111/bld-windows-amd64.zip",
+      "hash": "ff43c8b6bec0aa7c94d7d9dd7c1778ac46dcf7124c152de6a86a997122df133f"
     }
   },
   "bin": "bld.exe",
