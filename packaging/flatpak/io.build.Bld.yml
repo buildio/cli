@@ -1,0 +1,22 @@
+id: io.build.Bld
+
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+
+command: bld
+
+finish-args:
+  - --share=network
+  - --filesystem=home
+
+modules:
+  - name: bld
+    buildsystem: simple
+
+    build-commands:
+      - install -Dm755 bld /app/bin/bld
+
+    sources:
+      - type: file
+        path: bld

@@ -335,3 +335,52 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build-flatpak:
+    name: Build Flatpak
+    needs: build-linux-binary
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download Linux binary release attachment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          curl \
+            --fail \
+            --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --output packaging/flatpak/bld-linux-amd64.zip \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bld-linux-amd64.zip"
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: bld-linux-amd64.flatpak
+          manifest-path: packaging/flatpak/io.build.Bld.yml
+          arch: x86_64
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+
+      - name: Attach Flatpak to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: bld-linux-amd64.flatpak
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
