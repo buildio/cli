@@ -1,6 +1,6 @@
 # Build CLI
 
-## Install (Operating Systems (Package Manager))
+## Install
 ### macOS 15+ / Linux (Homebrew)
 
 Install Homebrew and setup envs:
