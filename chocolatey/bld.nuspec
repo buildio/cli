@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>bld</id>
+    <version>1.2.3</version>
+
+    <title>bld</title>
+    <authors>Build io</authors>
+    <owners>Build io</owners>
+
+    <projectUrl>https://github.com/buildio/cli</projectUrl>
+    <projectSourceUrl>https://github.com/buildio/cli</projectSourceUrl>
+    <packageSourceUrl>https://github.com/buildio/cli</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/buildio/cli/issues</bugTrackerUrl>
+
+    <licenseUrl>https://github.com/buildio/cli/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+
+    <summary>Build io command line interface</summary>
+    <description>
+      bld is the command-line interface for Build io, a PaaS.
+    </description>
+
+    <releaseNotes>https://github.com/buildio/cli/releases</releaseNotes>
+
+    <tags>bld buildio cli command-line</tags>
+  </metadata>
+
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
