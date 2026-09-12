@@ -1,13 +1,25 @@
 # Build CLI
 
-## Install
-### macOS (Homebrew)
+## Install (Operating Systems (Package Manager))
+### macOS 15+ / Linux (Homebrew)
 
-```zsh
+Install Homebrew and setup envs:
+
+```sh
+/bin/bash -c 'source <(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh) printf "\n%s\n" "eval \"\$(${HOMEBREW_PREFIX}/bin/brew shellenv${shellenv_suffix})\"" >> "${shell_rcfile}"'
+```
+
+```sh
 brew install buildio/cli/bld;brew trust buildio/cli
 ```
 
 ### Windows (Scoop)
+
+Install Scoop using non-elevated powershell:
+
+```powershell
+Set-ExecutionPolicy 4 0 -f;irm get.scoop.sh|iex;scoop install git
+```
 
 ```powershell
 scoop bucket add buildio https://github.com/buildio/cli
@@ -20,7 +32,7 @@ scoop install bld
 curl -fsSL https://buildio.github.io/cli/install.sh | sh
 ```
 
-Manual APT setup without `curl | sh`:
+Same APT setup without `curl | sh`:
 
 ```bash
 curl -fsSL https://buildio.github.io/cli/apt/gpg.key | gpg --batch --yes --dearmor | sudo tee /usr/share/keyrings/buildio-archive-keyring.gpg >/dev/null
@@ -28,9 +40,6 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg]
 echo 'Dir::Etc{SourceList sources.list.d/buildio-cli.list;SourceParts /dev/null}#clear APT::Update;'|sudo apt-get -c/dev/fd/0 update --no-list-cleanup
 sudo apt-get install -y buildio-archive-keyring bld
 ```
-
-
-If you previously installed `bld` manually into `/usr/local/bin`, remove that copy or ensure `/usr/bin` appears first in `PATH`; otherwise the manual binary can shadow the APT package.
 
 ## Build
 
