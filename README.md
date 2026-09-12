@@ -6,7 +6,7 @@
 Install Homebrew and setup envs:
 
 ```sh
-/bin/bash -c 'source <(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh) printf "\n%s\n" "eval \"\$(${HOMEBREW_PREFIX}/bin/brew shellenv${shellenv_suffix})\"" >> "${shell_rcfile}"'
+brew -v||eval "$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"|tee /dev/fd/2|grep '^    [es]')"
 ```
 
 ```sh
