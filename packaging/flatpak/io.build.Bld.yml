@@ -18,5 +18,6 @@ modules:
       - install -Dm755 bld /app/bin/bld
 
     sources:
-      - type: file
-        path: bld
+      - type: archive
+        path: bld-linux-amd64.zip
+        strip-components: 0
