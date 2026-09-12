@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>bld</id>
-    <version>1.1.110</version>
+    <version>1.1.111</version>
     <title>bld</title>
     <authors>Build io</authors>
     <owners>Build io</owners>
