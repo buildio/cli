@@ -13,6 +13,19 @@ brew -v||eval "$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebre
 brew install buildio/cli/bld;brew trust buildio/cli
 ```
 
+### Windows (Chocolatey)
+
+Install Chocolatey using elevated powershell:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr https://community.chocolatey.org/install.ps1 -UseBasicParsing | iex
+```
+
+```powershell
+choco source add --name=buildio --source="https://buildio.github.io/cli/chocolatey"
+choco install bld -y
+```
+
 ### Windows (Scoop)
 
 Install Scoop using non-elevated powershell:
