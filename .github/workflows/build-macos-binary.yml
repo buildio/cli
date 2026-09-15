@@ -30,9 +30,11 @@ jobs:
           - runner: macos-15-intel
             macports_pkg_platform: 15-Sequoia
             asset_arch: amd64
+            macos_min: '10.13'
           - runner: macos-14
             macports_pkg_platform: 14-Sonoma
             asset_arch: arm64
+            macos_min: '11.0'
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -59,12 +61,45 @@ jobs:
 
       - name: Build bld
         env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_min }}
           PKG_CONFIG_PATH: /opt/local/lib/pkgconfig
         run: |
           set -euo pipefail
           /opt/local/bin/shards install --production --frozen
           mkdir -p "bin/darwin-${{ matrix.asset_arch }}"
           /opt/local/bin/crystal build src/build_cli.cr --release --no-debug -o "bin/darwin-${{ matrix.asset_arch }}/bld"
+
+      - name: Verify deployment target
+        env:
+          EXPECTED_MACOS_MIN: ${{ matrix.macos_min }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+
+          binary = "bin/darwin-${{ matrix.asset_arch }}/bld"
+          def version_tuple(value):
+              parts = [int(part) for part in value.split(".")]
+              return tuple((parts + [0, 0, 0])[:3])
+
+          expected = version_tuple(os.environ["EXPECTED_MACOS_MIN"])
+          output = subprocess.check_output(["otool", "-l", binary], text=True)
+
+          match = re.search(r"\n\s+minos\s+([0-9.]+)", output)
+          if match is None:
+              match = re.search(r"\n\s+version\s+([0-9.]+)", output)
+          if match is None:
+              sys.exit(f"{binary} has no macOS minimum version load command")
+
+          actual_text = match.group(1)
+          actual = version_tuple(actual_text)
+          if actual > expected:
+              sys.exit(f"{binary} targets macOS {actual_text}, expected <= {os.environ['EXPECTED_MACOS_MIN']}")
+          print(f"{binary} targets macOS {actual_text}")
+          PY
 
       - name: Smoke test bld
         run: |
