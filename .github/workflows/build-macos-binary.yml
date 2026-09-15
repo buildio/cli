@@ -11,6 +11,9 @@ on:
         required: true
         type: string
 
+env:
+  MACPORTS_VERSION: 2.12.6
+
 concurrency:
   group: cli-pages-publish-${{ github.ref }}
   cancel-in-progress: false
@@ -25,12 +28,10 @@ jobs:
       matrix:
         include:
           - runner: macos-15-intel
-            macports_pkg: MacPorts-2.12.6-15-Sequoia.pkg
-            macports_pkg_url: https://github.com/macports/macports-base/releases/download/v2.12.6/MacPorts-2.12.6-15-Sequoia.pkg
+            macports_pkg_platform: 15-Sequoia
             asset_arch: amd64
           - runner: macos-14
-            macports_pkg: MacPorts-2.12.6-14-Sonoma.pkg
-            macports_pkg_url: https://github.com/macports/macports-base/releases/download/v2.12.6/MacPorts-2.12.6-14-Sonoma.pkg
+            macports_pkg_platform: 14-Sonoma
             asset_arch: arm64
     runs-on: ${{ matrix.runner }}
 
@@ -40,10 +41,11 @@ jobs:
 
       - name: Install MacPorts
         env:
-          MACPORTS_PKG: ${{ matrix.macports_pkg }}
-          MACPORTS_PKG_URL: ${{ matrix.macports_pkg_url }}
+          MACPORTS_PKG_PLATFORM: ${{ matrix.macports_pkg_platform }}
         run: |
           set -euo pipefail
+          MACPORTS_PKG="MacPorts-${MACPORTS_VERSION}-${MACPORTS_PKG_PLATFORM}.pkg"
+          MACPORTS_PKG_URL="https://github.com/macports/macports-base/releases/download/v${MACPORTS_VERSION}/${MACPORTS_PKG}"
           curl -fsSLo "$MACPORTS_PKG" "$MACPORTS_PKG_URL"
           sudo installer -pkg "$MACPORTS_PKG" -target /
           echo "/opt/local/bin" >> "$GITHUB_PATH"
