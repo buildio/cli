@@ -34,7 +34,7 @@ if {${build_arch} eq "arm64"} {
     }
 }
 
-depends_lib         port:bdw-gc \
+depends_lib         port:boehmgc \
                     port:libevent \
                     port:libiconv \
                     port:libssh2 \
