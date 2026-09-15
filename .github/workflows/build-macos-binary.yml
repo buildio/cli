@@ -1,0 +1,252 @@
+name: Build macOS Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.1.6)'
+        required: true
+        type: string
+
+env:
+  MACPORTS_VERSION: 2.12.6
+
+concurrency:
+  group: cli-pages-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            macports_pkg_platform: 15-Sequoia
+            asset_arch: amd64
+            macos_min: '10.7'
+          - runner: macos-14
+            macports_pkg_platform: 14-Sonoma
+            asset_arch: arm64
+            macos_min: '11.0'
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install MacPorts
+        env:
+          MACPORTS_PKG_PLATFORM: ${{ matrix.macports_pkg_platform }}
+        run: |
+          set -euo pipefail
+          MACPORTS_PKG="MacPorts-${MACPORTS_VERSION}-${MACPORTS_PKG_PLATFORM}.pkg"
+          MACPORTS_PKG_URL="https://github.com/macports/macports-base/releases/download/v${MACPORTS_VERSION}/${MACPORTS_PKG}"
+          curl -fsSLo "$MACPORTS_PKG" "$MACPORTS_PKG_URL"
+          sudo installer -pkg "$MACPORTS_PKG" -target /
+          echo "/opt/local/bin" >> "$GITHUB_PATH"
+          echo "/opt/local/sbin" >> "$GITHUB_PATH"
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo /opt/local/bin/port -N selfupdate
+          sudo /opt/local/bin/port -N install crystal pkgconfig bdw-gc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
+
+      - name: Build bld
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_min }}
+          PKG_CONFIG_PATH: /opt/local/lib/pkgconfig
+        run: |
+          set -euo pipefail
+          /opt/local/bin/shards install --production --frozen
+          mkdir -p "bin/darwin-${{ matrix.asset_arch }}"
+          /opt/local/bin/crystal build src/build_cli.cr --release --no-debug -o "bin/darwin-${{ matrix.asset_arch }}/bld"
+
+      - name: Verify deployment target
+        env:
+          EXPECTED_MACOS_MIN: ${{ matrix.macos_min }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+
+          binary = "bin/darwin-${{ matrix.asset_arch }}/bld"
+          def version_tuple(value):
+              parts = [int(part) for part in value.split(".")]
+              return tuple((parts + [0, 0, 0])[:3])
+
+          expected = version_tuple(os.environ["EXPECTED_MACOS_MIN"])
+          output = subprocess.check_output(["otool", "-l", binary], text=True)
+
+          match = re.search(r"\n\s+minos\s+([0-9.]+)", output)
+          if match is None:
+              match = re.search(r"\n\s+version\s+([0-9.]+)", output)
+          if match is None:
+              sys.exit(f"{binary} has no macOS minimum version load command")
+
+          actual_text = match.group(1)
+          actual = version_tuple(actual_text)
+          if actual > expected:
+              sys.exit(f"{binary} targets macOS {actual_text}, expected <= {os.environ['EXPECTED_MACOS_MIN']}")
+          print(f"{binary} targets macOS {actual_text}")
+          PY
+
+      - name: Smoke test bld
+        run: |
+          set -euo pipefail
+          HELP_OUTPUT="$(BUILD_NO_UPDATE_CHECK=1 "bin/darwin-${{ matrix.asset_arch }}/bld" --help)"
+          case "$HELP_OUTPUT" in
+            *Usage:*) ;;
+            *)
+              printf '%s\n' "$HELP_OUTPUT"
+              echo "bld --help produced no usage output" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Create release tarball
+        run: |
+          set -euo pipefail
+          PACKAGE_DIR="bld-darwin-${{ matrix.asset_arch }}"
+          rm -rf "bin/$PACKAGE_DIR"
+          mkdir -p "bin/$PACKAGE_DIR"
+          cp "bin/darwin-${{ matrix.asset_arch }}/bld" "bin/$PACKAGE_DIR/bld"
+          tar -czf "bin/darwin-${{ matrix.asset_arch }}/${PACKAGE_DIR}.tar.gz" -C bin "$PACKAGE_DIR"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bld-darwin-${{ matrix.asset_arch }}
+          path: bin/darwin-${{ matrix.asset_arch }}/bld-darwin-${{ matrix.asset_arch }}.tar.gz
+          if-no-files-found: error
+
+  publish-macos-binaries:
+    needs: build-macos-binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download macOS binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bld-darwin-*
+          path: dist
+          merge-multiple: true
+
+      - name: Install MacPorts publishing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y signify-openbsd
+
+      - name: Prepare MacPorts signing key
+        id: macports_signing
+        env:
+          MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64: ${{ secrets.MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64 }}
+          MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64: ${{ secrets.MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          SECRET_KEY_PATH="$RUNNER_TEMP/buildio-macports.sec"
+          PUBLIC_KEY_PATH="$RUNNER_TEMP/buildio-macports.pub"
+
+          if [ -n "$MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64" ]; then
+            echo "$MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64" | base64 -d > "$SECRET_KEY_PATH"
+            if [ -z "$MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64" ]; then
+              echo "::error::MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64 is missing. Store the public key generated with MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64."
+              exit 1
+            fi
+            echo "$MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64" | base64 -d > "$PUBLIC_KEY_PATH"
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store a fine-grained PAT with repository secrets write access as APT_SECRET_BOOTSTRAP_TOKEN to bootstrap the MacPorts signing key."
+              exit 1
+            fi
+
+            signify-openbsd -G -p "$PUBLIC_KEY_PATH" -s "$SECRET_KEY_PATH" -c "Build.io MacPorts ports tree"
+            PRIVATE_KEY_BASE64="$(base64 "$SECRET_KEY_PATH" | tr -d '\n')"
+            PUBLIC_KEY_BASE64="$(base64 "$PUBLIC_KEY_PATH" | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            printf '%s' "$PUBLIC_KEY_BASE64" | gh secret set MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new MacPorts ports-tree signing key for future releases."
+          fi
+
+          chmod 0600 "$SECRET_KEY_PATH"
+          signify-openbsd -S -s "$SECRET_KEY_PATH" -m packaging/macports/Portfile.tpl -x "$RUNNER_TEMP/macports-key-smoke.sig"
+          signify-openbsd -V -p "$PUBLIC_KEY_PATH" -m packaging/macports/Portfile.tpl -x "$RUNNER_TEMP/macports-key-smoke.sig"
+
+          echo "secret_key_path=$SECRET_KEY_PATH" >> "$GITHUB_OUTPUT"
+          echo "public_key_path=$PUBLIC_KEY_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Publish MacPorts repository
+        env:
+          MACPORTS_SIGNIFY_PUBLIC_KEY: ${{ steps.macports_signing.outputs.public_key_path }}
+          MACPORTS_SIGNIFY_SECRET_KEY: ${{ steps.macports_signing.outputs.secret_key_path }}
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          : "${MACPORTS_SIGNIFY_PUBLIC_KEY:?MACPORTS_SIGNIFY_PUBLIC_KEY is required}"
+          : "${MACPORTS_SIGNIFY_SECRET_KEY:?MACPORTS_SIGNIFY_SECRET_KEY is required}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          rm -rf public-pages
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add public-pages origin/gh-pages
+          else
+            git worktree add --detach public-pages
+            git -C public-pages checkout --orphan gh-pages
+            git -C public-pages rm -rf . || true
+          fi
+
+          rm -rf public-pages/macports
+          python3 packaging/macports/build_repository.py \
+            --version "$VERSION" \
+            --asset x86_64=dist/bld-darwin-amd64.tar.gz \
+            --asset arm64=dist/bld-darwin-arm64.tar.gz \
+            --output public-pages/macports
+          signify-openbsd -S -s "$MACPORTS_SIGNIFY_SECRET_KEY" -m public-pages/macports/ports.tar -x public-pages/macports/ports.tar.sig
+          cp "$MACPORTS_SIGNIFY_PUBLIC_KEY" public-pages/macports/buildio-ports.pub
+          touch public-pages/.nojekyll
+
+          git -C public-pages add macports .nojekyll
+          git -C public-pages commit -m "Publish MacPorts package ${VERSION}" || true
+          git -C public-pages push origin HEAD:gh-pages
+
+      - name: Upload macOS binaries to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          files: |
+            dist/bld-darwin-amd64.tar.gz
+            dist/bld-darwin-arm64.tar.gz
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
