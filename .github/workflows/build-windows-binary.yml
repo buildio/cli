@@ -179,3 +179,243 @@ jobs:
             git push origin main
           }
         shell: pwsh
+
+      - name: Update Chocolatey manifest
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $zipPath = "bin/windows-amd64/bld-windows-amd64.zip"
+          $nuspecPath = "chocolatey/bld.nuspec"
+          $installScriptPath = "chocolatey/tools/chocolateyInstall.ps1"
+
+          $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          $downloadUrl = "https://github.com/buildio/cli/releases/download/v$env:VERSION/bld-windows-amd64.zip"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Pick up the Scoop manifest commit from the previous step.
+          git fetch origin main
+          git checkout -B main origin/main
+
+          # Update the Chocolatey package version.
+          [xml]$nuspec = Get-Content -Path $nuspecPath -Raw
+          $nuspec.package.metadata.version = $env:VERSION
+          $resolvedNuspecPath = (Resolve-Path $nuspecPath).Path
+          $nuspec.Save($resolvedNuspecPath)
+
+          # Update chocolateyInstall.ps1.
+          $installScript = Get-Content -Path $installScriptPath -Raw
+
+          # Prefer the explicit 64-bit Chocolatey fields. Fall back to url/checksum
+          # if the package currently uses those instead.
+          $url64Pattern = "(?im)^(\s*url64(?:bit)?\s*=\s*)'[^']*'"
+          $urlPattern = "(?im)^(\s*url\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $url64Pattern)) {
+            $installScript = $installScript -replace `
+              $url64Pattern, `
+              ('$1' + "'$downloadUrl'")
+          } elseif ([regex]::IsMatch($installScript, $urlPattern)) {
+            $installScript = $installScript -replace `
+              $urlPattern, `
+              ('$1' + "'$downloadUrl'")
+          } else {
+            throw "Could not find url64/url64bit/url in $installScriptPath"
+          }
+
+          $checksum64Pattern = "(?im)^(\s*checksum64\s*=\s*)'[^']*'"
+          $checksumPattern = "(?im)^(\s*checksum\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $checksum64Pattern)) {
+            $installScript = $installScript -replace `
+              $checksum64Pattern, `
+              ('$1' + "'$hash'")
+          } elseif ([regex]::IsMatch($installScript, $checksumPattern)) {
+            $installScript = $installScript -replace `
+              $checksumPattern, `
+              ('$1' + "'$hash'")
+          } else {
+            throw "Could not find checksum64/checksum in $installScriptPath"
+          }
+
+          $checksumType64Pattern = "(?im)^(\s*checksumType64\s*=\s*)'[^']*'"
+          $checksumTypePattern = "(?im)^(\s*checksumType\s*=\s*)'[^']*'"
+
+          if ([regex]::IsMatch($installScript, $checksumType64Pattern)) {
+            $installScript = $installScript -replace `
+              $checksumType64Pattern, `
+              ('$1' + "'sha256'")
+          } elseif ([regex]::IsMatch($installScript, $checksumTypePattern)) {
+            $installScript = $installScript -replace `
+              $checksumTypePattern, `
+              ('$1' + "'sha256'")
+          } else {
+            throw "Could not find checksumType64/checksumType in $installScriptPath"
+          }
+
+          Set-Content `
+            -Path $installScriptPath `
+            -Value $installScript `
+            -Encoding utf8 `
+            -NoNewline
+
+          git add $nuspecPath $installScriptPath
+
+          $changedFiles = git diff --cached --name-only
+
+          if (-not $changedFiles) {
+            Write-Host "Chocolatey manifest already current."
+          } else {
+            git commit -m "Update Chocolatey manifest to v$env:VERSION"
+            git push origin main
+          }
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish Chocolatey repository
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check whether gh-pages already exists.
+          git ls-remote --exit-code --heads origin gh-pages *> $null
+
+          if ($LASTEXITCODE -eq 0) {
+            git fetch origin gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to fetch gh-pages"
+            }
+
+            git worktree add public-pages origin/gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create gh-pages worktree"
+            }
+          }
+          else {
+            git worktree add --detach public-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create detached worktree"
+            }
+
+            git -C public-pages checkout --orphan gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to create orphan gh-pages branch"
+            }
+
+            git -C public-pages rm -rf . 2>$null
+
+            # git rm may return non-zero when there's nothing to remove.
+            $global:LASTEXITCODE = 0
+          }
+
+          $chocolateyPackages = Join-Path $env:RUNNER_TEMP "chocolatey-packages"
+
+          if (Test-Path $chocolateyPackages) {
+            Remove-Item -Recurse -Force $chocolateyPackages
+          }
+
+          New-Item -ItemType Directory -Force -Path $chocolateyPackages | Out-Null
+
+          dotnet pack chocolatey/bld.nuspec `
+            --version $env:VERSION `
+            --output $chocolateyPackages
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet pack failed"
+          }
+
+          $nupkgPath = Join-Path $chocolateyPackages "bld.$($env:VERSION).nupkg"
+
+          if (-not (Test-Path $nupkgPath)) {
+            throw "Chocolatey package was not created: $nupkgPath"
+          }
+
+          $sleetTools = Join-Path $env:RUNNER_TEMP "sleet-tools"
+
+          if (Test-Path $sleetTools) {
+            Remove-Item -Recurse -Force $sleetTools
+          }
+
+          dotnet tool install `
+            --tool-path $sleetTools `
+            sleet `
+            --version 7.2.0
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install Sleet"
+          }
+
+          $sleetConfig = Join-Path $env:RUNNER_TEMP "sleet.json"
+          $chocolateyFeedPath = Join-Path $env:GITHUB_WORKSPACE "public-pages/chocolatey"
+
+          $config = @{
+            username = "github-actions[bot]"
+            useremail = "github-actions[bot]@users.noreply.github.com"
+            sources = @(
+              @{
+                name = "buildio"
+                type = "local"
+                path = $chocolateyFeedPath
+                baseURI = "https://buildio.github.io/cli/chocolatey/"
+              }
+            )
+          }
+
+          $config |
+            ConvertTo-Json -Depth 10 |
+            Set-Content -Path $sleetConfig -Encoding utf8
+
+          if ($IsWindows) {
+            $sleet = Join-Path $sleetTools "sleet.exe"
+          }
+          else {
+            $sleet = Join-Path $sleetTools "sleet"
+          }
+
+          & $sleet push `
+            $nupkgPath `
+            --config $sleetConfig `
+            --source buildio
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Sleet push failed"
+          }
+
+          git -C public-pages add chocolatey
+
+          git -C public-pages diff --cached --quiet
+
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Chocolatey repository already current."
+          }
+          elseif ($LASTEXITCODE -eq 1) {
+            git -C public-pages commit -m "Publish Chocolatey package $env:VERSION"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to commit Chocolatey repository"
+            }
+
+            git -C public-pages push origin HEAD:gh-pages
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to push gh-pages"
+            }
+          }
+          else {
+            throw "git diff failed"
+          }

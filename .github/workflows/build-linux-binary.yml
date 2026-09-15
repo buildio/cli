@@ -187,8 +187,11 @@ jobs:
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
 
-
-      - name: Publish APT repository
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish APT and Chocolatey repository
         env:
           APT_GPG_KEY_ID: ${{ steps.signing.outputs.key_id }}
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
@@ -270,21 +273,21 @@ jobs:
           import sys
 
           lines = Path("README.md").read_text().splitlines()
-          marker = next((i for i, line in enumerate(lines) if line == "Manual APT setup without `curl | sh`:"), None)
+          marker = next((i for i, line in enumerate(lines) if line == "Same APT setup without `curl | sh`:"), None)
           if marker is None:
-              sys.exit("README.md is missing the manual APT setup section")
+              sys.exit("README.md is missing the Same APT setup section")
 
           start = next((i for i in range(marker + 1, len(lines)) if lines[i] == "```bash"), None)
           if start is None:
-              sys.exit("README.md manual APT setup section is missing a bash code block")
+              sys.exit("README.md Same APT setup section is missing a bash code block")
 
           end = next((i for i in range(start + 1, len(lines)) if lines[i] == "```"), None)
           if end is None:
-              sys.exit("README.md manual APT setup section has an unterminated code block")
+              sys.exit("README.md Same APT setup section has an unterminated code block")
 
           install_script = "\n".join(lines[start + 1:end]).strip()
           if not install_script:
-              sys.exit("README.md manual APT setup section is empty")
+              sys.exit("README.md Same APT setup section is empty")
 
           print(install_script)
           PY
@@ -334,6 +337,55 @@ jobs:
             ${{ steps.keyring.outputs.keyring_deb_path }}
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build-flatpak:
+    name: Build Flatpak
+    needs: build-linux-binary
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download Linux binary release attachment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          curl \
+            --fail \
+            --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --output packaging/flatpak/bld-linux-amd64.zip \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bld-linux-amd64.zip"
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: bld-linux-amd64.flatpak
+          manifest-path: packaging/flatpak/io.build.Bld.yml
+          arch: x86_64
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+
+      - name: Attach Flatpak to release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: bld-linux-amd64.flatpak
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,9 +1,15 @@
 # Build CLI
 
 ## Install
-### macOS (Homebrew)
+### macOS 15+ / Linux (Homebrew)
 
-```zsh
+Install Homebrew and setup envs:
+
+```sh
+brew -v||eval "$(bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"|tee /dev/fd/2|grep '^    [es]')"
+```
+
+```sh
 brew install buildio/cli/bld;brew trust buildio/cli
 ```
 
@@ -18,7 +24,26 @@ echo 'https://buildio.github.io/cli/macports/ports.tar' | sudo tee -a /opt/local
 sudo port sync && sudo port install bld
 ```
 
+### Windows (Chocolatey)
+
+Install Chocolatey using elevated powershell:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr https://community.chocolatey.org/install.ps1 -UseBasicParsing | iex
+```
+
+```powershell
+choco source add --name=buildio --source="https://buildio.github.io/cli/chocolatey/index.json"
+choco install bld -y
+```
+
 ### Windows (Scoop)
+
+Install Scoop using non-elevated powershell:
+
+```powershell
+Set-ExecutionPolicy 4 0 -f;irm get.scoop.sh|iex;scoop install git
+```
 
 ```powershell
 scoop bucket add buildio https://github.com/buildio/cli
@@ -31,17 +56,14 @@ scoop install bld
 curl -fsSL https://buildio.github.io/cli/install.sh | sh
 ```
 
-Manual APT setup without `curl | sh`:
+Same APT setup without `curl | sh`:
 
 ```bash
 curl -fsSL https://buildio.github.io/cli/apt/gpg.key | gpg --batch --yes --dearmor | sudo tee /usr/share/keyrings/buildio-archive-keyring.gpg >/dev/null
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg] https://buildio.github.io/cli/apt stable main" | sudo tee /etc/apt/sources.list.d/buildio-cli.list >/dev/null
-sudo apt-get update -o Dir::Etc::sourcelist="sources.list.d/buildio-cli.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+echo 'Dir::Etc{SourceList sources.list.d/buildio-cli.list;SourceParts /dev/null}#clear APT::Update;'|sudo apt-get -c/dev/fd/0 update --no-list-cleanup
 sudo apt-get install -y buildio-archive-keyring bld
 ```
-
-
-If you previously installed `bld` manually into `/usr/local/bin`, remove that copy or ensure `/usr/bin` appears first in `PATH`; otherwise the manual binary can shadow the APT package.
 
 ## Build
 
