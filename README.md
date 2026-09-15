@@ -18,9 +18,7 @@ brew install buildio/cli/bld;brew trust buildio/cli
 MacPorts verifies HTTPS ports tree snapshots, so trust the Build.io ports key once before adding the source:
 
 ```bash
-curl -fsSL https://buildio.github.io/cli/macports/buildio-ports.pub | sudo tee /opt/local/share/macports/buildio-ports.pub >/dev/null
-echo /opt/local/share/macports/buildio-ports.pub | sudo tee -a /opt/local/etc/macports/pubkeys.conf >/dev/null
-echo 'https://buildio.github.io/cli/macports/ports.tar' | sudo tee -a /opt/local/etc/macports/sources.conf >/dev/null
+sudo sh -c 'm=/mac$0/;f=$1-$0.pub;u=https://$1.github.io/cli$m;cd /opt/local/share$m;curl -fsSLO $u$f;cd ../../etc$m;echo $OLDPWD/$f>>pubkeys.conf;echo $u$0.tar>>sources.conf' ports buildio
 sudo port sync && sudo port install bld
 ```
 
