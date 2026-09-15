@@ -1,0 +1,52 @@
+# -*- tcl -*-
+PortSystem          1.0
+
+name                bld
+version             1.1.122
+revision            0
+categories          sysutils net
+platforms           darwin
+supported_archs     x86_64 arm64
+universal_variant   no
+license             MIT
+maintainers         {build.io:support @buildio} openmaintainer
+
+description         Build.io command-line client
+long_description    Heroku-compatible command-line client for Build.io.
+homepage            https://app.build.io
+
+master_sites        https://github.com/buildio/cli/releases/download/v${version}/
+
+if {${build_arch} eq "arm64"} {
+    distname        bld-darwin-arm64
+    checksums       rmd160  273ef99d92ea2ba37cba2bb395a238075a325efe \
+                    sha256  bd7acc09aab4a60e18dfdfabd5cb6cfb97c6cff5262c72cdfeef65204d4bd784 \
+                    size    1384706
+} elseif {${build_arch} eq "x86_64"} {
+    distname        bld-darwin-amd64
+    checksums       rmd160  b3377b54c32842c9f6ccff206a6ff596adf04dd5 \
+                    sha256  58fe681eb523c13ecf0209c55c52704a3a3ede07cd497b85449235c0dd383a9a \
+                    size    1390520
+} else {
+    known_fail      yes
+    pre-fetch {
+        return -code error "bld provides prebuilt MacPorts binaries for x86_64 and arm64 only"
+    }
+}
+
+depends_lib         port:boehmgc \
+                    port:libevent \
+                    port:libiconv \
+                    port:libssh2 \
+                    port:libxml2 \
+                    port:libyaml \
+                    path:lib/libssl.dylib:openssl3 \
+                    port:pcre2
+
+use_configure       no
+build {}
+
+destroot {
+    xinstall -d ${destroot}${prefix}/bin
+    xinstall -m 0755 ${worksrcpath}/bld ${destroot}${prefix}/bin/bld
+}
