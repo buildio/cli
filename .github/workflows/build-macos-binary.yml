@@ -30,7 +30,7 @@ jobs:
           - runner: macos-15-intel
             macports_pkg_platform: 15-Sequoia
             asset_arch: amd64
-            macos_min: '10.13'
+            macos_min: '10.7'
           - runner: macos-14
             macports_pkg_platform: 14-Sonoma
             asset_arch: arm64
