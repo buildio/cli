@@ -28,11 +28,9 @@ jobs:
       matrix:
         include:
           - runner: macos-15-intel
-            macports_pkg_platform: 15-Sequoia
             asset_arch: amd64
             macos_min: '10.7'
           - runner: macos-14
-            macports_pkg_platform: 14-Sonoma
             asset_arch: arm64
             macos_min: '11.0'
     runs-on: ${{ matrix.runner }}
@@ -42,14 +40,15 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install MacPorts
-        env:
-          MACPORTS_PKG_PLATFORM: ${{ matrix.macports_pkg_platform }}
         run: |
           set -euo pipefail
-          MACPORTS_PKG="MacPorts-${MACPORTS_VERSION}-${MACPORTS_PKG_PLATFORM}.pkg"
-          MACPORTS_PKG_URL="https://github.com/macports/macports-base/releases/download/v${MACPORTS_VERSION}/${MACPORTS_PKG}"
-          curl -fsSLo "$MACPORTS_PKG" "$MACPORTS_PKG_URL"
-          sudo installer -pkg "$MACPORTS_PKG" -target /
+          MACPORTS_SOURCE="MacPorts-${MACPORTS_VERSION}.tar.gz"
+          MACPORTS_SOURCE_URL="https://github.com/macports/macports-base/releases/download/v${MACPORTS_VERSION}/${MACPORTS_SOURCE}"
+          curl -fsSLo "$MACPORTS_SOURCE" "$MACPORTS_SOURCE_URL"
+          tar -xzf "$MACPORTS_SOURCE"
+          (cd "MacPorts-${MACPORTS_VERSION}" && ./configure --prefix=/opt/local)
+          make -C "MacPorts-${MACPORTS_VERSION}" -j"$(sysctl -n hw.ncpu)"
+          sudo make -C "MacPorts-${MACPORTS_VERSION}" install
           echo "/opt/local/bin" >> "$GITHUB_PATH"
           echo "/opt/local/sbin" >> "$GITHUB_PATH"
 
