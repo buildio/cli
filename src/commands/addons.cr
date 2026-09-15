@@ -190,7 +190,6 @@ module Build
         protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
           app_name = input.option("app", type: String)
           plan = input.argument("plan", type: String)
-          addon_name = input.option("name", type: String?)
           addon_human_name = input.option("human-name", type: String?)
           addon_description = input.option("description", type: String?)
           config_opts = input.option("config", type: Array(String))
@@ -208,7 +207,7 @@ module Build
           begin
             api
             addons_api = ::Build::AddonsApi.new
-            req = ::Build::CreateAddonRequest.new(plan: plan, name: addon_name, human_name: addon_human_name, description: addon_description, config: config)
+            req = ::Build::CreateAddonRequest.new(plan: plan, human_name: addon_human_name, description: addon_description, config: config)
             addon = addons_api.create_addon(app_name, req)
 
             if json_output
