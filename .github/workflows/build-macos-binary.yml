@@ -122,12 +122,16 @@ jobs:
           cp "bin/darwin-${{ matrix.asset_arch }}/bld" "bin/$PACKAGE_DIR/bld"
           tar -czf "bin/darwin-${{ matrix.asset_arch }}/${PACKAGE_DIR}.tar.gz" -C bin "$PACKAGE_DIR"
 
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload macOS binary to release
+        uses: softprops/action-gh-release@v3
         with:
-          name: bld-darwin-${{ matrix.asset_arch }}
-          path: bin/darwin-${{ matrix.asset_arch }}/bld-darwin-${{ matrix.asset_arch }}.tar.gz
-          if-no-files-found: error
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          files: bin/darwin-${{ matrix.asset_arch }}/bld-darwin-${{ matrix.asset_arch }}.tar.gz
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-macos-binaries:
     needs: build-macos-binaries
@@ -148,12 +152,18 @@ jobs:
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download macOS binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: bld-darwin-*
-          path: dist
-          merge-multiple: true
+      - name: Download macOS release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: v${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern bld-darwin-amd64.tar.gz \
+            --pattern bld-darwin-arm64.tar.gz \
+            --dir dist
 
       - name: Install MacPorts publishing tools
         run: |
@@ -236,16 +246,3 @@ jobs:
           git -C public-pages add macports .nojekyll
           git -C public-pages commit -m "Publish MacPorts package ${VERSION}" || true
           git -C public-pages push origin HEAD:gh-pages
-
-      - name: Upload macOS binaries to release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          files: |
-            dist/bld-darwin-amd64.tar.gz
-            dist/bld-darwin-arm64.tar.gz
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
