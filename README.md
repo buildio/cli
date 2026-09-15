@@ -7,6 +7,17 @@
 brew install buildio/cli/bld;brew trust buildio/cli
 ```
 
+### macOS (MacPorts)
+
+MacPorts verifies HTTPS ports tree snapshots, so trust the Build.io ports key once before adding the source:
+
+```bash
+curl -fsSL https://buildio.github.io/cli/macports/buildio-ports.pub | sudo tee /opt/local/share/macports/buildio-ports.pub >/dev/null
+echo /opt/local/share/macports/buildio-ports.pub | sudo tee -a /opt/local/etc/macports/pubkeys.conf >/dev/null
+echo 'https://buildio.github.io/cli/macports/ports.tar' | sudo tee -a /opt/local/etc/macports/sources.conf >/dev/null
+sudo port sync && sudo port install bld
+```
+
 ### Windows (Scoop)
 
 ```powershell
@@ -39,17 +50,17 @@ If you previously installed `bld` manually into `/usr/local/bin`, remove that co
 shards build
 ```
 
-### Static Linux Binary Build
+### Release Builds
 
-The repository includes a GitHub Action (`.github/workflows/build-linux-binary.yml`) that automatically builds a static Linux binary and Debian package when a version tag is pushed. The APT repository is published to GitHub Pages. This action:
+The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binary, Debian packages, and APT repository. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT and MacPorts repositories are published to GitHub Pages. These actions:
 
 - **Purpose**: Creates a completely static Linux binary using Alpine Linux for maximum portability
 - **Use Cases**:
   - Provides an easy-to-use binary for Linux users without Crystal dependencies
   - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
 - **Trigger**: Automatically runs when pushing tags like `v1.1.6`
-- **Build Process**: Uses Docker with Alpine Linux base image to create a fully static binary with all dependencies compiled in
-- **Output**: Releases a `bld-linux-amd64.zip` file containing the static binary, plus `bld_<version>-1_amd64.deb` and `buildio-archive-keyring_<version>-1_all.deb` package assets
+- **Build Process**: Uses Docker with Alpine Linux for the static Linux binary, and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`
+- **Output**: Releases `bld-linux-amd64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, and `buildio-archive-keyring_<version>-1_all.deb` package assets
 
 To trigger a new release:
 
@@ -59,6 +70,8 @@ git push origin v1.1.7
 ```
 
 APT publishing needs a stable GPG signing key because users' `apt` clients trust the repository through `/usr/share/keyrings/buildio-archive-keyring.gpg`. The workflow bootstraps that key automatically when `APT_GPG_PRIVATE_KEY_BASE64` is missing: it generates a repository signing key, uses it for the current publish, and saves `APT_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The signing key ID is derived from the imported private key on each run, so there is no separate key-id secret. The public key bundle is derived from the signing key by default; set the repository variable `APT_GPG_PUBLIC_KEYS_BASE64` only when planned rotation needs an old+new armored public-key bundle. Keeping `APT_SECRET_BOOTSTRAP_TOKEN` lets the workflow update APT signing secrets during future bootstrap/rotation work without another manual token handoff. To seed it, open GitHub's official fine-grained PAT form with prefilled owner/expiration/permission fields, select only the `buildio/cli` repository manually, generate the token, paste it into the prompt, and store it with `open 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo buildio/cli --body "$APT_SECRET_BOOTSTRAP_TOKEN"`. GitHub documents `target_name` as the resource owner, not as a selected repository, so the repository selection remains manual. The `buildio-archive-keyring` package owns `/usr/share/keyrings/buildio-archive-keyring.gpg`, so publish old+new public keys while the old key still signs the repository, let users update, then switch the private-key secret to the new signing key.
+
+MacPorts publishing uses a Signify signature because `port sync` verifies HTTPS ports tree snapshots before extracting them. The macOS workflow bootstraps `MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64` and `MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64` through the same `APT_SECRET_BOOTSTRAP_TOKEN` secret when they are missing, publishes `macports/ports.tar`, signs it as `macports/ports.tar.sig`, and publishes `macports/buildio-ports.pub` for users to add to `pubkeys.conf`. The Portfile installs precompiled `bld-darwin-amd64.tar.gz` or `bld-darwin-arm64.tar.gz` release assets; it does not build the CLI from source on user machines.
 
 The workflow generates the published `install.sh` from the manual APT setup code block above, so that block is the single source of truth for both install paths.
 

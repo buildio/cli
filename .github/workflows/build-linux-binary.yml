@@ -11,6 +11,10 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: cli-pages-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -49,6 +53,7 @@ jobs:
         run: |
           cd bin/linux-amd64
           zip -j bld-linux-amd64.zip bld
+
 
       - name: Build Debian package
         id: deb
@@ -181,6 +186,7 @@ jobs:
           dpkg-deb --contents "$DEB_PATH"
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
+
 
       - name: Publish APT repository
         env:
