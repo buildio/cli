@@ -5,8 +5,8 @@ $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $packageArgs = @{
   packageName    = 'bld'
   unzipLocation  = $toolsDir
-  url64bit       = 'https://github.com/buildio/cli/releases/download/v1.1.115/bld-windows-amd64.zip'
-  checksum64     = '259785abd94c3248d13781f0ab0fd12648cfe0fef6a2788ad762512374bede36'
+  url64bit       = 'https://github.com/buildio/cli/releases/download/v1.1.119/bld-windows-amd64.zip'
+  checksum64     = 'b433dce1f942979bac52005179c6a55860f23bdbe800b16dabee0cb03a4931fd'
   checksumType64 = 'sha256'
 }
 
