@@ -1,2 +1,2 @@
 untrusted comment: verify with buildio-macports.pub
-RWRqEnEMvQcZbXvdne5TClNyq1Q0FJ94XehviMsqsi8RdbwvbKsUJtgiuv9PAfwLWHrOShREbPfIflBO0VZsNEjIJSiFAuI5VgI=
+RWRqEnEMvQcZbWjsI1NKojlOf6UyUJBlhDsvPRMpyh4kRPDn9KGr49K4ub8jutFHY7BeOcZkDk4tQlxFxfqNTjeL5HNOtTf+Hws=
