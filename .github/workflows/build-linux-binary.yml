@@ -79,6 +79,86 @@ jobs:
           echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
           echo "deb_path=bld_${DEB_VERSION}_amd64.deb" >> "$GITHUB_OUTPUT"
 
+      - name: Build Alpine package
+        id: apk
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+
+          PKGVER="${VERSION}-r0"
+          BUILDDATE="$(git log -1 --pretty=format:%ct)"
+          SIZE="$(stat -c '%s' bin/linux-amd64/bld)"
+
+          mkdir -p "$RUNNER_TEMP/apk-build/pkg/usr/bin"
+          install -m 0755 bin/linux-amd64/bld "$RUNNER_TEMP/apk-build/pkg/usr/bin/bld"
+
+          sed \
+            -e "s/@PKGVER@/${PKGVER}/" \
+            -e "s/@BUILDDATE@/${BUILDDATE}/" \
+            -e "s/@SIZE@/${SIZE}/" \
+            packaging/apk/PKGINFO.tpl > "$RUNNER_TEMP/apk-build/.PKGINFO"
+
+          docker run --rm \
+            -e PKGVER \
+            -v "$RUNNER_TEMP/apk-build:/work" \
+            -w /work \
+            alpine:3.24 \
+            sh -c '
+              set -eu
+              apk add --no-cache abuild >/dev/null
+              . /usr/share/abuild/functions.sh
+
+              # Data section: sorted, per-file checksums (mirrors abuild create_apks)
+              (
+                cd pkg
+                find usr -print0 | LC_ALL=C sort -z \
+                  | apk_tar -T - --owner=0 --group=0 --numeric-owner \
+                  | abuild-tar --hash | gzip -n -9
+              ) > data.tar.gz
+
+              # Control section: .PKGINFO with datahash
+              echo "datahash = $(sha256sum data.tar.gz | cut -f1 -d" ")" >> .PKGINFO
+              printf "%s\0" .PKGINFO > .metafiles
+              apk_tar -T .metafiles | abuild-tar --cut | gzip -n -9 > control.tar.gz
+
+              cat control.tar.gz data.tar.gz > "bld-${PKGVER}.apk"
+            '
+
+          echo "apk_path=$RUNNER_TEMP/apk-build/bld-${PKGVER}.apk" >> "$GITHUB_OUTPUT"
+          echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare APK signing key
+        id: apk_signing
+        env:
+          APK_SIGNING_KEY_BASE64: ${{ secrets.APK_SIGNING_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apk-keys"
+
+          if [ -n "$APK_SIGNING_KEY_BASE64" ]; then
+            echo "$APK_SIGNING_KEY_BASE64" | base64 -d | tar -C "$RUNNER_TEMP/apk-keys" -x
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::APK_SIGNING_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store the fine-grained PAT with secrets:write for the buildio/cli repository as the persistent bootstrap secret (same one the APT key bootstrap uses)."
+              exit 1
+            fi
+
+            openssl genrsa -out "$RUNNER_TEMP/apk-keys/buildio.rsa" 4096 2>/dev/null
+            openssl rsa -in "$RUNNER_TEMP/apk-keys/buildio.rsa" -pubout -out "$RUNNER_TEMP/apk-keys/buildio.rsa.pub" 2>/dev/null
+
+            tar -C "$RUNNER_TEMP/apk-keys" -c buildio.rsa buildio.rsa.pub | base64 | tr -d '\n' > "$RUNNER_TEMP/apk-secret-body"
+            echo "::add-mask::$(cat "$RUNNER_TEMP/apk-secret-body")"
+            gh secret set APK_SIGNING_KEY_BASE64 --repo "$GITHUB_REPOSITORY" < "$RUNNER_TEMP/apk-secret-body"
+            rm -f "$RUNNER_TEMP/apk-secret-body"
+            echo "Generated and saved a new APK signing key for future releases."
+          fi
+
+          test -s "$RUNNER_TEMP/apk-keys/buildio.rsa"
+          test -s "$RUNNER_TEMP/apk-keys/buildio.rsa.pub"
+          echo "keys_dir=$RUNNER_TEMP/apk-keys" >> "$GITHUB_OUTPUT"
+
       - name: Prepare APT signing key
         id: signing
         env:
@@ -187,6 +267,33 @@ jobs:
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
 
+      - name: Sign and verify Alpine package
+        env:
+          APK_PATH: ${{ steps.apk.outputs.apk_path }}
+          APK_KEYS_DIR: ${{ steps.apk_signing.outputs.keys_dir }}
+        run: |
+          set -euo pipefail
+          APK_NAME="$(basename "$APK_PATH")"
+          docker run --rm \
+            -e APK_NAME \
+            -v "$(dirname "$APK_PATH"):/work" \
+            -v "${APK_KEYS_DIR}:/keys:ro" \
+            alpine:3.24 \
+            sh -c '
+              set -eu
+              apk add --no-cache abuild >/dev/null
+
+              # Embed the repository signature in the package (RSA256 = RSA/SHA-256)
+              abuild-sign -k /keys/buildio.rsa -t RSA256 "/work/$APK_NAME"
+
+              # Verify like a user: trust the key, then install and run the binary
+              cp /keys/buildio.rsa.pub /etc/apk/keys/
+              apk add --no-cache "/work/$APK_NAME"
+              BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
+              apk info bld
+            '
+          cp "$APK_PATH" "bld-${{ steps.apk.outputs.pkgver }}.apk"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -194,6 +301,9 @@ jobs:
       - name: Publish APT and Chocolatey repository
         env:
           APT_GPG_KEY_ID: ${{ steps.signing.outputs.key_id }}
+          APK_PATH: ${{ steps.apk.outputs.apk_path }}
+          APK_KEYS_DIR: ${{ steps.apk_signing.outputs.keys_dir }}
+          PKGVER: ${{ steps.apk.outputs.pkgver }}
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
           DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
           KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
@@ -266,6 +376,35 @@ jobs:
 
           cp "$PUBLIC_KEYS_PATH" "$APTLY_ROOT/public/apt/gpg.key"
 
+          # --- APK repository: retain all published packages, re-index, sign ---
+          rm -rf "$RUNNER_TEMP/apk-repo"
+          mkdir -p "$RUNNER_TEMP/apk-repo/x86_64"
+          if [ -d public-pages/apk/x86_64 ]; then
+            cp public-pages/apk/x86_64/*.apk "$RUNNER_TEMP/apk-repo/x86_64/" 2>/dev/null || true
+          fi
+          cp "$APK_PATH" "$RUNNER_TEMP/apk-repo/x86_64/"
+
+          docker run --rm \
+            -v "$RUNNER_TEMP/apk-repo:/repo" \
+            -v "$APK_KEYS_DIR:/keys:ro" \
+            alpine:3.24 \
+            sh -c '
+              set -eu
+              apk add --no-cache abuild >/dev/null
+              apk index \
+                --no-warnings --quiet \
+                --output /repo/x86_64/APKINDEX.tar.gz \
+                --description "Build.io CLI" \
+                --rewrite-arch x86_64 \
+                /repo/x86_64/*.apk
+              abuild-sign -k /keys/buildio.rsa -t RSA256 /repo/x86_64/APKINDEX.tar.gz
+            '
+
+          rm -rf public-pages/apk
+          mkdir -p public-pages/apk
+          cp -a "$RUNNER_TEMP/apk-repo/x86_64" public-pages/apk/x86_64
+          cp "$APK_KEYS_DIR/buildio.rsa.pub" public-pages/apk/buildio.rsa.pub
+
           rm -rf public-pages/apt
           cp -a "$APTLY_ROOT/public/apt" public-pages/apt
           python3 - <<'PY' > public-pages/install.sh
@@ -294,8 +433,8 @@ jobs:
           chmod 0755 public-pages/install.sh
           touch public-pages/.nojekyll
 
-          git -C public-pages add apt install.sh .nojekyll
-          git -C public-pages commit -m "Publish APT package ${DEB_VERSION}" || true
+          git -C public-pages add apt apk install.sh .nojekyll
+          git -C public-pages commit -m "Publish APT package ${DEB_VERSION} and APK package ${PKGVER}" || true
           git -C public-pages push origin HEAD:gh-pages
 
       - name: Build release body
@@ -335,6 +474,7 @@ jobs:
             bin/linux-amd64/bld-linux-amd64.zip
             ${{ steps.deb.outputs.deb_path }}
             ${{ steps.keyring.outputs.keyring_deb_path }}
+            bld-${{ steps.apk.outputs.pkgver }}.apk
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
