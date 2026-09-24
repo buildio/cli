@@ -69,7 +69,8 @@ jobs:
             -w /work \
             alpine:3.24 \
             sh -c '
-              set -eu
+              # functions.sh is not set -u safe (unguarded ${VAR-$VAR} refs)
+              set -e
               apk add --no-cache abuild >/dev/null
               . /usr/share/abuild/functions.sh
 
@@ -188,7 +189,8 @@ jobs:
             -w /work \
             alpine:3.24 \
             sh -c '
-              set -eu
+              # functions.sh is not set -u safe (unguarded ${VAR-$VAR} refs)
+              set -e
               apk add --no-cache abuild >/dev/null
               . /usr/share/abuild/functions.sh
 
