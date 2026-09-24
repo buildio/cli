@@ -79,15 +79,15 @@ shards build
 
 ### Release Builds
 
-The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binary, Debian packages, the APT repository, the Alpine package, and the APK repository. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT, APK, and MacPorts repositories are published to GitHub Pages. These actions:
+The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binaries, Debian packages, the APT repository, the Alpine packages, and the APK repositories. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT, APK, and MacPorts repositories are published to GitHub Pages. These actions:
 
 - **Purpose**: Creates a completely static Linux binary using Alpine Linux for maximum portability
 - **Use Cases**:
   - Provides an easy-to-use binary for Linux users without Crystal dependencies
   - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
 - **Trigger**: Automatically runs when pushing tags like `v1.1.6`
-- **Build Process**: Uses Docker with Alpine Linux for the static Linux binary, and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`; Intel binaries request `MACOSX_DEPLOYMENT_TARGET=10.7` for Lion and newer, while Apple Silicon binaries target macOS 11.0 and newer
-- **Output**: Releases `bld-linux-amd64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, and `bld_<version>-r0.apk` package assets
+- **Build Process**: Uses Docker with Alpine Linux for the static Linux binary (natively on both amd64 and arm64 runners, so no emulation is needed for compilation), and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`; Intel binaries request `MACOSX_DEPLOYMENT_TARGET=10.7` for Lion and newer, while Apple Silicon binaries target macOS 11.0 and newer
+- **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, and `bld_<version>-r0_aarch64.apk` package assets; the APK repository serves `x86_64` and `aarch64` indexes, so the same install steps work on both architectures
 
 To trigger a new release:
 

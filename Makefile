@@ -1,16 +1,17 @@
 # Define variables
+PLATFORM ?= linux/amd64
 BINARY := bld
-BINDIR := bin/linux-amd64/
+BINDIR := bin/linux-$(notdir $(PLATFORM))/
 REPO := buildio/bins
-ZIPFILE := bld-linux-amd64.zip
+ZIPFILE := bld-linux-$(notdir $(PLATFORM)).zip
 
 # Define the default target
 .PHONY: build release clean
 build:
-	# Build CLI ends up in bin/linux-amd64/bld
+	# Build CLI ends up in $(BINDIR)$(BINARY)
 	mkdir -p $(BINDIR)
 	docker build -t bld-cli-build .
-	docker run --rm --platform linux/amd64 -v "$(PWD):/workspace" bld-cli-build \
+	docker run --rm --platform $(PLATFORM) -v "$(PWD):/workspace" bld-cli-build \
 	sh -c "shards check || shards install --production --frozen && crystal build src/build_cli.cr --release --no-debug --static -o $(BINDIR)$(BINARY) && strip $(BINDIR)$(BINARY);"
 
 # Create a release zip (for local testing or CI)
@@ -30,3 +31,4 @@ release:
 clean:
 	@echo "Cleaning up..."
 	rm -f $(ZIPFILE)
+
