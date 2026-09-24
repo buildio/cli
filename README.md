@@ -65,10 +65,9 @@ sudo apt-get install -y buildio-archive-keyring bld
 
 ### Linux (APK)
 
-```sh
-sudo curl -fsSL -o /etc/apk/keys/buildio.rsa.pub https://buildio.github.io/cli/apk/buildio.rsa.pub
-echo "https://buildio.github.io/cli/apk" | sudo tee -a /etc/apk/repositories
-sudo apk update && sudo apk add bld
+```bash
+sudo sh -c 'e=/etc/$1;u=https://$0.github.io/cli/$1;k=$0.rsa.pub;wget -qO $e/keys/$k $u/$k;echo $u>>$e/repositories' buildio apk
+sudo apk update&&sudo apk add bld
 ```
 
 ## Build
