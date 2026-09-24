@@ -19,7 +19,91 @@ permissions:
   contents: write
 
 jobs:
+  build-linux-arm64-binary:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Linux binary
+        run: |
+          make build PLATFORM=linux/arm64
+
+      - name: Create release zip
+        run: |
+          cd bin/linux-arm64
+          zip -j bld-linux-arm64.zip bld
+
+      - name: Build Alpine package
+        id: apk
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${VERSION#v}"
+          PKGVER="${VERSION}-r0"
+          export PKGVER
+          BUILDDATE="$(git log -1 --pretty=format:%ct)"
+          SIZE="$(stat -c '%s' bin/linux-arm64/bld)"
+
+          mkdir -p "$RUNNER_TEMP/apk-build/pkg/usr/bin"
+          install -m 0755 bin/linux-arm64/bld "$RUNNER_TEMP/apk-build/pkg/usr/bin/bld"
+
+          sed \
+            -e "s/@PKGVER@/${PKGVER}/" \
+            -e "s/@BUILDDATE@/${BUILDDATE}/" \
+            -e "s/@SIZE@/${SIZE}/" \
+            -e "s/@ARCH@/aarch64/" \
+            packaging/apk/PKGINFO.tpl > "$RUNNER_TEMP/apk-build/.PKGINFO"
+
+          docker run --rm \
+            -e PKGVER \
+            -v "$RUNNER_TEMP/apk-build:/work" \
+            -w /work \
+            alpine:3.24 \
+            sh -c '
+              set -eu
+              apk add --no-cache abuild >/dev/null
+              . /usr/share/abuild/functions.sh
+
+              # Data section: sorted, per-file checksums (mirrors abuild create_apks)
+              (
+                cd pkg
+                find usr -print0 | LC_ALL=C sort -z \
+                  | apk_tar -T - --owner=0 --group=0 --numeric-owner \
+                  | abuild-tar --hash | gzip -n -9
+              ) > data.tar.gz
+
+              # Control section: .PKGINFO with datahash
+              echo "datahash = $(sha256sum data.tar.gz | cut -f1 -d" ")" >> .PKGINFO
+              printf "%s\0" .PKGINFO > .metafiles
+              apk_tar -T .metafiles | abuild-tar --cut | gzip -n -9 > control.tar.gz
+
+              cat control.tar.gz data.tar.gz > "bld-${PKGVER}.apk"
+            '
+
+          echo "apk_path=$RUNNER_TEMP/apk-build/bld-${PKGVER}.apk" >> "$GITHUB_OUTPUT"
+          echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+          mkdir -p arm64-artifacts
+          cp "$RUNNER_TEMP/apk-build/bld-${PKGVER}.apk" arm64-artifacts/
+          cp bin/linux-arm64/bld-linux-arm64.zip arm64-artifacts/
+
+      - name: Upload arm64 artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-arm64-artifacts
+          path: arm64-artifacts/
+          if-no-files-found: error
+
   build-linux-binary:
+    needs: build-linux-arm64-binary
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +114,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
 
       - name: Install Debian packaging tools
         run: |
@@ -66,14 +153,8 @@ jobs:
           PACKAGE_ROOT="pkg/bld_${DEB_VERSION}_amd64"
 
           rm -rf "$PACKAGE_ROOT"
-          mkdir -p "$PACKAGE_ROOT/DEBIAN"
-          mkdir -p "$PACKAGE_ROOT/usr/bin"
-          mkdir -p "$PACKAGE_ROOT/usr/share/doc/bld"
-
-          install -m 0755 bin/linux-amd64/bld "$PACKAGE_ROOT/usr/bin/bld"
           sed "s/@DEB_VERSION@/${DEB_VERSION}/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
           install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/bld/copyright"
-
           dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "bld_${DEB_VERSION}_amd64.deb"
 
           echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
@@ -87,6 +168,7 @@ jobs:
           set -euo pipefail
 
           PKGVER="${VERSION}-r0"
+          export PKGVER
           BUILDDATE="$(git log -1 --pretty=format:%ct)"
           SIZE="$(stat -c '%s' bin/linux-amd64/bld)"
 
@@ -97,6 +179,7 @@ jobs:
             -e "s/@PKGVER@/${PKGVER}/" \
             -e "s/@BUILDDATE@/${BUILDDATE}/" \
             -e "s/@SIZE@/${SIZE}/" \
+            -e "s/@ARCH@/x86_64/" \
             packaging/apk/PKGINFO.tpl > "$RUNNER_TEMP/apk-build/.PKGINFO"
 
           docker run --rm \
@@ -267,13 +350,24 @@ jobs:
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
 
-      - name: Sign and verify Alpine package
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-arm64-artifacts
+          path: arm64-artifacts
+
+      - name: Sign and verify Alpine packages
         env:
           APK_PATH: ${{ steps.apk.outputs.apk_path }}
           APK_KEYS_DIR: ${{ steps.apk_signing.outputs.keys_dir }}
+          PKGVER: ${{ steps.apk.outputs.pkgver }}
         run: |
           set -euo pipefail
           APK_NAME="$(basename "$APK_PATH")"
+          export APK_NAME
+          ARM_APK="arm64-artifacts/bld-${PKGVER}.apk"
+          test -s "$ARM_APK"
+
           docker run --rm \
             -e APK_NAME \
             -v "$(dirname "$APK_PATH"):/work" \
@@ -292,7 +386,25 @@ jobs:
               BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
               apk info bld
             '
-          cp "$APK_PATH" "bld-${{ steps.apk.outputs.pkgver }}.apk"
+
+          # Sign and user-verify the aarch64 package under emulation
+          mv "$ARM_APK" "arm64-artifacts/bld-aarch64.apk"
+          docker run --rm \
+            --platform linux/arm64 \
+            -v "$(pwd)/arm64-artifacts:/work" \
+            -v "${APK_KEYS_DIR}:/keys:ro" \
+            alpine:3.24 \
+            sh -c '
+              set -eu
+              apk add --no-cache abuild >/dev/null
+              abuild-sign -k /keys/buildio.rsa -t RSA256 /work/bld-aarch64.apk
+              cp /keys/buildio.rsa.pub /etc/apk/keys/
+              apk add --no-cache /work/bld-aarch64.apk
+              BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
+              apk info bld
+            '
+          mv arm64-artifacts/bld-aarch64.apk "bld-${PKGVER}_aarch64.apk"
+          cp "$APK_PATH" "bld-${PKGVER}.apk"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -376,13 +488,16 @@ jobs:
 
           cp "$PUBLIC_KEYS_PATH" "$APTLY_ROOT/public/apt/gpg.key"
 
-          # --- APK repository: retain all published packages, re-index, sign ---
+          # --- APK repositories: retain all published packages, re-index, sign ---
           rm -rf "$RUNNER_TEMP/apk-repo"
-          mkdir -p "$RUNNER_TEMP/apk-repo/x86_64"
-          if [ -d public-pages/apk/x86_64 ]; then
-            cp public-pages/apk/x86_64/*.apk "$RUNNER_TEMP/apk-repo/x86_64/" 2>/dev/null || true
-          fi
+          for ARCH in x86_64 aarch64; do
+            mkdir -p "$RUNNER_TEMP/apk-repo/$ARCH"
+            if [ -d "public-pages/apk/$ARCH" ]; then
+              cp "public-pages/apk/$ARCH"/*.apk "$RUNNER_TEMP/apk-repo/$ARCH/" 2>/dev/null || true
+            fi
+          done
           cp "$APK_PATH" "$RUNNER_TEMP/apk-repo/x86_64/"
+          cp "bld-${PKGVER}_aarch64.apk" "$RUNNER_TEMP/apk-repo/aarch64/"
 
           docker run --rm \
             -v "$RUNNER_TEMP/apk-repo:/repo" \
@@ -391,18 +506,21 @@ jobs:
             sh -c '
               set -eu
               apk add --no-cache abuild >/dev/null
-              apk index \
-                --no-warnings --quiet \
-                --output /repo/x86_64/APKINDEX.tar.gz \
-                --description "Build.io CLI" \
-                --rewrite-arch x86_64 \
-                /repo/x86_64/*.apk
-              abuild-sign -k /keys/buildio.rsa -t RSA256 /repo/x86_64/APKINDEX.tar.gz
+              for ARCH in x86_64 aarch64; do
+                apk index \
+                  --no-warnings --quiet \
+                  --output "/repo/$ARCH/APKINDEX.tar.gz" \
+                  --description "Build.io CLI" \
+                  --rewrite-arch "$ARCH" \
+                  /repo/$ARCH/*.apk
+                abuild-sign -k /keys/buildio.rsa -t RSA256 "/repo/$ARCH/APKINDEX.tar.gz"
+              done
             '
 
           rm -rf public-pages/apk
           mkdir -p public-pages/apk
           cp -a "$RUNNER_TEMP/apk-repo/x86_64" public-pages/apk/x86_64
+          cp -a "$RUNNER_TEMP/apk-repo/aarch64" public-pages/apk/aarch64
           cp "$APK_KEYS_DIR/buildio.rsa.pub" public-pages/apk/buildio.rsa.pub
 
           rm -rf public-pages/apt
@@ -472,9 +590,11 @@ jobs:
           body_path: release-body.md
           files: |
             bin/linux-amd64/bld-linux-amd64.zip
+            arm64-artifacts/bld-linux-arm64.zip
             ${{ steps.deb.outputs.deb_path }}
             ${{ steps.keyring.outputs.keyring_deb_path }}
             bld-${{ steps.apk.outputs.pkgver }}.apk
+            bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk
           draft: false
           prerelease: false
           fail_on_unmatched_files: true

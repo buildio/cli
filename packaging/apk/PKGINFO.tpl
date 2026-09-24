@@ -5,6 +5,6 @@ url = https://app.build.io
 builddate = @BUILDDATE@
 packager = Build.io <support@build.io>
 size = @SIZE@
-arch = x86_64
+arch = @ARCH@
 origin = bld
 depend = ca-certificates
