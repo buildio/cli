@@ -1,0 +1,10 @@
+pkgname = bld
+pkgver = @PKGVER@
+pkgdesc = Build.io command-line client
+url = https://app.build.io
+builddate = @BUILDDATE@
+packager = Build.io <support@build.io>
+size = @SIZE@
+arch = x86_64
+origin = bld
+depend = ca-certificates
