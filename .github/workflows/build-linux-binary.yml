@@ -711,7 +711,7 @@ jobs:
           PUBLIC_KEYS_PATH: ${{ steps.keyring.outputs.public_keys_path }}
           PACMAN_GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
           PACMAN_PKG_PATH: ${{ steps.pacman.outputs.pkg_path }}
-          PACMAN_KEY_FPR: ${{ steps.pacman_signing.outputs.key_fpr }}
+          KEY_FPR: ${{ steps.pacman_signing.outputs.key_fpr }}
         run: |
           set -euo pipefail
           : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID is required}"
@@ -855,7 +855,7 @@ jobs:
           cp -a "$RUNNER_TEMP/pacman-repo/x86_64" public-pages/pacman/x86_64
           cp -a "$RUNNER_TEMP/pacman-repo/aarch64" public-pages/pacman/aarch64
           cp "$PUBLIC_KEYS_PATH" public-pages/pacman/k
-          printf '%s\n' "$PACMAN_KEY_FPR" > public-pages/pacman/f
+          printf '%s\n' "$KEY_FPR" > public-pages/pacman/f
 
           rm -rf public-pages/apt
           cp -a "$APTLY_ROOT/public/apt" public-pages/apt
