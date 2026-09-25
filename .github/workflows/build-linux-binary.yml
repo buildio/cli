@@ -636,7 +636,7 @@ jobs:
 
           # Stage key + both arch packages in per-arch repo dirs
           mkdir -p pacman-verify/x86_64 pacman-verify/aarch64
-          cp "$PUBLIC_KEY_PATH" pacman-verify/pacman.asc
+          cp "$PUBLIC_KEY_PATH" pacman-verify/k
           cp "$PKG_PATH" "$PKG_PATH.sig" pacman-verify/x86_64/
           cp "$ARM_PKG" "$ARM_PKG.sig" pacman-verify/aarch64/
 
@@ -667,7 +667,7 @@ jobs:
               bash -c '
                 set -eu
                 pacman-key --init
-                pacman-key --add /repo/pacman.asc
+                pacman-key --add /repo/k
                 pacman-key --lsign-key "$KEY_FPR"
                 printf "[bld]\nSigLevel = Required\nServer = file:///repo/%s\n" "$ARCH" >> /etc/pacman.conf
                 pacman -Sy --noconfirm bld
@@ -834,7 +834,7 @@ jobs:
           mkdir -p public-pages/pacman
           cp -a "$RUNNER_TEMP/pacman-repo/x86_64" public-pages/pacman/x86_64
           cp -a "$RUNNER_TEMP/pacman-repo/aarch64" public-pages/pacman/aarch64
-          cp "$PUBLIC_KEYS_PATH" public-pages/pacman/pacman.asc
+          cp "$PUBLIC_KEYS_PATH" public-pages/pacman/k
           printf '%s\n' "$PACMAN_KEY_FPR" > public-pages/pacman/f
 
           rm -rf public-pages/apt
