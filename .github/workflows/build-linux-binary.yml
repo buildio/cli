@@ -154,8 +154,14 @@ jobs:
           PACKAGE_ROOT="pkg/bld_${DEB_VERSION}_amd64"
 
           rm -rf "$PACKAGE_ROOT"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN"
+          mkdir -p "$PACKAGE_ROOT/usr/bin"
+          mkdir -p "$PACKAGE_ROOT/usr/share/doc/bld"
+
+          install -m 0755 bin/linux-amd64/bld "$PACKAGE_ROOT/usr/bin/bld"
           sed "s/@DEB_VERSION@/${DEB_VERSION}/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
           install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/bld/copyright"
+
           dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "bld_${DEB_VERSION}_amd64.deb"
 
           echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
