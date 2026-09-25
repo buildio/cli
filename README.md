@@ -73,7 +73,7 @@ sudo apk update&&sudo apk add bld
 ### Linux (pacman)
 
 ```bash
-sudo sh -c 'u=https://buildio.github.io/cli/pacman;curl -fsSL $u/buildio-pacman.asc|pacman-key --add -;pacman-key --lsign-key "$(curl -fsSL $u/key-fingerprint)";printf "[bld]\nSigLevel = Required\nServer = $u/$arch\n">>/etc/pacman.conf'
+sudo sh -c 'u=https://$0.github.io/cli/$1;p=pacman-key;curl -fsSL $u/$1.asc|$p -a -;$p --lsign-key $(curl -fsSL $u/f);printf "[bld]\nSigLevel=Required\nServer=$u/$arch\n">>/etc/pacman.conf' buildio pacman
 sudo pacman -Sy bld
 ```
 
@@ -107,7 +107,7 @@ APT publishing needs a stable GPG signing key because users' `apt` clients trust
 
 APK publishing needs a stable RSA signing key because users' `apk` clients trust the repository through `/etc/apk/keys/buildio.rsa.pub`. The workflow bootstraps that key automatically when `APK_SIGNING_KEY_BASE64` is missing: it generates a 4096-bit key named `buildio.rsa`, uses it for the current publish, and saves `APK_SIGNING_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The key has no expiry (apk's raw RSA signatures carry no certificate layer), so rotation happens only on compromise. On rotation, keep the old public key in the publish keys so previously published packages keep verifying, and users re-run the same `/etc/apk/keys` curl from the README.
 
-Pacman publishing needs a stable GPG signing key because users' `pacman` clients trust the repository through `pacman-key` (import + local sign of the key fingerprint). The workflow bootstraps that key automatically when `PACMAN_GPG_PRIVATE_KEY_BASE64` is missing: it generates a 4096-bit RSA key for "Build.io Pacman Repository", uses it for the current publish, and saves `PACMAN_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The key fingerprint is published at `pacman/key-fingerprint` so the install setup can pass it to `pacman-key --lsign-key` without users needing to copy it manually.
+Pacman publishing needs a stable GPG signing key because users' `pacman` clients trust the repository through `pacman-key` (import + local sign of the key fingerprint). The workflow bootstraps that key automatically when `PACMAN_GPG_PRIVATE_KEY_BASE64` is missing: it generates a 4096-bit RSA key for "Build.io Pacman Repository", uses it for the current publish, and saves `PACMAN_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The key is published at `pacman/pacman.asc` and its fingerprint at `pacman/f`, so the install setup can feed both to `pacman-key` without manual copy-paste.
 
 MacPorts publishing uses a Signify signature because `port sync` verifies HTTPS ports tree snapshots before extracting them. The macOS workflow bootstraps `MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64` and `MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64` through the same `APT_SECRET_BOOTSTRAP_TOKEN` secret when they are missing, publishes `macports/ports.tar`, signs it as `macports/ports.tar.sig`, and publishes `macports/buildio-ports.pub` for users to add to `pubkeys.conf`. The Portfile installs precompiled `bld-darwin-amd64.tar.gz` or `bld-darwin-arm64.tar.gz` release assets; it does not build the CLI from source on user machines. The Intel artifact requests the oldest 64-bit Intel deployment target, macOS 10.7 Lion, and the workflow fails if the produced binary reports a newer minimum target.
 
