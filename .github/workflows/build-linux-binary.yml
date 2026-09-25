@@ -105,6 +105,50 @@ jobs:
             echo "gnupg_home=$RUNNER_TEMP/pacman-gnupg"
             echo "public_key_path=$RUNNER_TEMP/pacman-public-key.asc"
           } >> "$GITHUB_OUTPUT"
+      - name: Prepare RPM signing key
+        id: rpm_signing
+        env:
+          RPM_GPG_PRIVATE_KEY_BASE64: ${{ secrets.RPM_GPG_PRIVATE_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rpm-gnupg"
+          chmod 700 "$RUNNER_TEMP/rpm-gnupg"
+
+          if [ -n "$RPM_GPG_PRIVATE_KEY_BASE64" ]; then
+            echo "$RPM_GPG_PRIVATE_KEY_BASE64" | base64 -d | GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --import
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::RPM_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store the fine-grained PAT with secrets:write for the buildio/cli repository as the persistent bootstrap secret (same one the APT key bootstrap uses)."
+              exit 1
+            fi
+
+            cat > "$RUNNER_TEMP/rpm-gpg-batch" <<'EOF'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Key-Usage: sign
+          Name-Real: Build.io RPM Repository
+          Name-Email: support@build.io
+          Expire-Date: 0
+          %commit
+          EOF
+
+            GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --generate-key "$RUNNER_TEMP/rpm-gpg-batch"
+            PRIVATE_KEY_BASE64="$(GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --yes --armor --export-secret-keys | base64 | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set RPM_GPG_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new RPM signing key for future releases."
+          fi
+
+          KEY_FPR="$(GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          test -n "$KEY_FPR"
+          GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --yes --armor --export "$KEY_FPR" > "$RUNNER_TEMP/rpm-public-key.asc"
+          {
+            echo "key_fpr=$KEY_FPR"
+            echo "gnupg_home=$RUNNER_TEMP/rpm-gnupg"
+            echo "public_key_path=$RUNNER_TEMP/rpm-public-key.asc"
+          } >> "$GITHUB_OUTPUT"
       - name: Build Alpine package
         id: apk
         env:
@@ -225,6 +269,45 @@ jobs:
           echo "pkg_path=$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst" arm64-artifacts/
           cp "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst.sig" arm64-artifacts/
+      - name: Build RPM package
+        id: rpm
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          GNUPG_HOME: ${{ steps.rpm_signing.outputs.gnupg_home }}
+          KEY_FPR: ${{ steps.rpm_signing.outputs.key_fpr }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${VERSION#v}"
+
+          mkdir -p "$RUNNER_TEMP/rpm-build/SOURCES"
+          install -m 0755 bin/linux-arm64/bld "$RUNNER_TEMP/rpm-build/SOURCES/bld"
+
+          sed \
+            -e "s/@VERSION@/${VERSION}/" \
+            -e "s/@ARCH@/aarch64/" \
+            packaging/rpm/bld.spec.tpl > "$RUNNER_TEMP/rpm-build/bld.spec"
+
+          docker run --rm \
+            -v "$RUNNER_TEMP/rpm-build:/work" \
+            -w /work \
+            fedora:46 \
+            bash -c '
+              set -eu
+              mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+              mv bld.spec rpmbuild/SPECS/
+              rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
+              mv rpmbuild/RPMS/aarch64/bld-*.rpm /work/
+            '
+
+          # Embedded package signature (rpmsign with the repository key)
+          GNUPGHOME="$GNUPG_HOME" rpmsign \
+            --define "%_gpg_name $KEY_FPR" \
+            --addsign "$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.aarch64.rpm" >/dev/null
+
+          test -s "$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.aarch64.rpm"
+          echo "pkg_path=$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.aarch64.rpm" >> "$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/rpm-build/bld-$VERSION-1.aarch64.rpm" arm64-artifacts/
       - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -359,6 +442,50 @@ jobs:
             echo "gnupg_home=$RUNNER_TEMP/pacman-gnupg"
             echo "public_key_path=$RUNNER_TEMP/pacman-public-key.asc"
           } >> "$GITHUB_OUTPUT"
+      - name: Prepare RPM signing key
+        id: rpm_signing
+        env:
+          RPM_GPG_PRIVATE_KEY_BASE64: ${{ secrets.RPM_GPG_PRIVATE_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rpm-gnupg"
+          chmod 700 "$RUNNER_TEMP/rpm-gnupg"
+
+          if [ -n "$RPM_GPG_PRIVATE_KEY_BASE64" ]; then
+            echo "$RPM_GPG_PRIVATE_KEY_BASE64" | base64 -d | GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --import
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::RPM_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store the fine-grained PAT with secrets:write for the buildio/cli repository as the persistent bootstrap secret (same one the APT key bootstrap uses)."
+              exit 1
+            fi
+
+            cat > "$RUNNER_TEMP/rpm-gpg-batch" <<'EOF'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Key-Usage: sign
+          Name-Real: Build.io RPM Repository
+          Name-Email: support@build.io
+          Expire-Date: 0
+          %commit
+          EOF
+
+            GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --generate-key "$RUNNER_TEMP/rpm-gpg-batch"
+            PRIVATE_KEY_BASE64="$(GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --yes --armor --export-secret-keys | base64 | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set RPM_GPG_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new RPM signing key for future releases."
+          fi
+
+          KEY_FPR="$(GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          test -n "$KEY_FPR"
+          GNUPGHOME="$RUNNER_TEMP/rpm-gnupg" gpg --batch --yes --armor --export "$KEY_FPR" > "$RUNNER_TEMP/rpm-public-key.asc"
+          {
+            echo "key_fpr=$KEY_FPR"
+            echo "gnupg_home=$RUNNER_TEMP/rpm-gnupg"
+            echo "public_key_path=$RUNNER_TEMP/rpm-public-key.asc"
+          } >> "$GITHUB_OUTPUT"
       - name: Build Alpine package
         id: apk
         env:
@@ -473,6 +600,44 @@ jobs:
           test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst"
           test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst.sig"
           echo "pkg_path=$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
+      - name: Build RPM package
+        id: rpm
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          GNUPG_HOME: ${{ steps.rpm_signing.outputs.gnupg_home }}
+          KEY_FPR: ${{ steps.rpm_signing.outputs.key_fpr }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${VERSION#v}"
+
+          mkdir -p "$RUNNER_TEMP/rpm-build/SOURCES"
+          install -m 0755 bin/linux-amd64/bld "$RUNNER_TEMP/rpm-build/SOURCES/bld"
+
+          sed \
+            -e "s/@VERSION@/${VERSION}/" \
+            -e "s/@ARCH@/x86_64/" \
+            packaging/rpm/bld.spec.tpl > "$RUNNER_TEMP/rpm-build/bld.spec"
+
+          docker run --rm \
+            -v "$RUNNER_TEMP/rpm-build:/work" \
+            -w /work \
+            fedora:46 \
+            bash -c '
+              set -eu
+              mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+              mv bld.spec rpmbuild/SPECS/
+              rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
+              mv rpmbuild/RPMS/x86_64/bld-*.rpm /work/
+            '
+
+          # Embedded package signature (rpmsign with the repository key)
+          GNUPGHOME="$GNUPG_HOME" rpmsign \
+            --define "%_gpg_name $KEY_FPR" \
+            --addsign "$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.x86_64.rpm" >/dev/null
+
+          test -s "$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.x86_64.rpm"
+          echo "pkg_path=$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.x86_64.rpm" >> "$GITHUB_OUTPUT"
       - name: Prepare APT signing key
         id: signing
         env:
@@ -695,6 +860,59 @@ jobs:
               bsdtar -tf bld.db.tar.gz | grep -q "bld-${PVER}/"
             '
           echo "aarch64 package verified (signature, structure, metadata, db entry)"
+      - name: Verify RPM packages
+        env:
+          GNUPG_HOME: ${{ steps.rpm_signing.outputs.gnupg_home }}
+          PUBLIC_KEY_PATH: ${{ steps.rpm_signing.outputs.public_key_path }}
+          KEY_FPR: ${{ steps.rpm_signing.outputs.key_fpr }}
+          PKG_PATH: ${{ steps.rpm.outputs.pkg_path }}
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          ARM_PKG="arm64-artifacts/bld-${VERSION}-1.aarch64.rpm"
+          test -s "$ARM_PKG"
+
+          # Stage key + both arch packages in per-arch repo dirs
+          mkdir -p rpm-verify/x86_64 rpm-verify/aarch64
+          cp "$PUBLIC_KEY_PATH" rpm-verify/k
+          cp "$PKG_PATH" rpm-verify/x86_64/
+          cp "$ARM_PKG" rpm-verify/aarch64/
+
+          # Build repo metadata and sign repomd.xml for repo_gpgcheck
+          docker run --rm \
+            -e GNUPGHOME=/gnupg \
+            -e KEY_FPR \
+            -v "$(pwd)/rpm-verify:/repo" \
+            -v "${GNUPG_HOME}:/gnupg" \
+            fedora:46 \
+            bash -c '
+              set -eu
+              dnf install -y createrepo_c >/dev/null
+              for ARCH in x86_64 aarch64; do
+                cd "/repo/$ARCH"
+                createrepo_c .
+                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --no-armor repodata/repomd.xml
+              done
+            '
+
+          # Verify like a user, per arch: import key, install from repo, run the binary
+          for ARCH in x86_64 aarch64; do
+            PLATFORM_ARGS=()
+            [ "$ARCH" = aarch64 ] && PLATFORM_ARGS=(--platform linux/arm64)
+            docker run --rm \
+              "${PLATFORM_ARGS[@]}" \
+              -e ARCH \
+              -v "$(pwd)/rpm-verify:/repo:ro" \
+              fedora:46 \
+              bash -c '
+                set -eu
+                rpm --import /repo/k
+                printf "[bld]\nbaseurl=file:///repo/%s\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file:///repo/k\n" "$ARCH" > /etc/yum.repos.d/bld.repo
+                dnf install -y --disablerepo="*" --enablerepo=bld bld >/dev/null
+                BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
+                rpm -qi bld | head -6
+              '
+          done
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -712,6 +930,9 @@ jobs:
           PACMAN_GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
           PACMAN_PKG_PATH: ${{ steps.pacman.outputs.pkg_path }}
           KEY_FPR: ${{ steps.pacman_signing.outputs.key_fpr }}
+          RPM_GNUPG_HOME: ${{ steps.rpm_signing.outputs.gnupg_home }}
+          RPM_KEY_FPR: ${{ steps.rpm_signing.outputs.key_fpr }}
+          RPM_PKG_PATH: ${{ steps.rpm.outputs.pkg_path }}
         run: |
           set -euo pipefail
           : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID is required}"
@@ -857,6 +1078,39 @@ jobs:
           cp "$PUBLIC_KEYS_PATH" public-pages/pacman/k
           printf '%s\n' "$KEY_FPR" > public-pages/pacman/f
 
+          # --- RPM repositories: retain all published packages, rebuild metadata, sign ---
+          rm -rf "$RUNNER_TEMP/rpm-repo"
+          for ARCH in x86_64 aarch64; do
+            mkdir -p "$RUNNER_TEMP/rpm-repo/$ARCH"
+            if [ -d "public-pages/rpm/$ARCH" ]; then
+              cp "public-pages/rpm/$ARCH"/bld-*.rpm "$RUNNER_TEMP/rpm-repo/$ARCH/" 2>/dev/null || true
+            fi
+          done
+          cp "$RPM_PKG_PATH" "$RUNNER_TEMP/rpm-repo/x86_64/"
+          cp "arm64-artifacts/bld-${PKGVER%-r0}-1-aarch64.rpm" "$RUNNER_TEMP/rpm-repo/aarch64/"
+
+          docker run --rm \
+            -e GNUPGHOME=/gnupg \
+            -e KEY_FPR \
+            -v "$RUNNER_TEMP/rpm-repo:/repo" \
+            -v "$RPM_GNUPG_HOME:/gnupg" \
+            fedora:46 \
+            bash -c '
+              set -eu
+              dnf install -y createrepo_c >/dev/null
+              for ARCH in x86_64 aarch64; do
+                cd "/repo/$ARCH"
+                createrepo_c .
+                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --no-armor repodata/repomd.xml
+              done
+            '
+
+          rm -rf public-pages/rpm
+          mkdir -p public-pages/rpm
+          cp -a "$RUNNER_TEMP/rpm-repo/x86_64" public-pages/rpm/x86_64
+          cp -a "$RUNNER_TEMP/rpm-repo/aarch64" public-pages/rpm/aarch64
+          cp "$PUBLIC_KEYS_PATH" public-pages/rpm/k
+
           rm -rf public-pages/apt
           cp -a "$APTLY_ROOT/public/apt" public-pages/apt
           python3 - <<'PY' > public-pages/install.sh
@@ -885,7 +1139,7 @@ jobs:
           chmod 0755 public-pages/install.sh
           touch public-pages/.nojekyll
 
-          git -C public-pages add apt apk pacman install.sh .nojekyll
+          git -C public-pages add apt apk pacman rpm install.sh .nojekyll
           git -C public-pages commit -m "Publish APT package ${DEB_VERSION} and APK package ${PKGVER}" || true
           git -C public-pages push origin HEAD:gh-pages
       - name: Build release body
@@ -929,6 +1183,8 @@ jobs:
             bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk
             pacman-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst
             pacman-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst
+            rpm-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.rpm
+            rpm-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.rpm
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
