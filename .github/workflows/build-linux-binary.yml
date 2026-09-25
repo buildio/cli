@@ -1,45 +1,36 @@
 name: Build Linux Binary
-
-on:
+'on':
   push:
     tags:
-      - 'v*'
+      - v*
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.1.6)'
+        description: Version to build (e.g., 1.1.6)
         required: true
         type: string
-
 concurrency:
   group: cli-pages-publish-${{ github.ref }}
   cancel-in-progress: false
-
 permissions:
   contents: write
-
 jobs:
   build-linux-arm64-binary:
     runs-on: ubuntu-24.04-arm
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
       - name: Build Linux binary
         run: |
           make build PLATFORM=linux/arm64
-
       - name: Create release zip
         run: |
           cd bin/linux-arm64
           zip -j bld-linux-arm64.zip bld
-
       - name: Prepare APK signing key
         id: apk_signing
         env:
@@ -70,7 +61,50 @@ jobs:
           test -s "$RUNNER_TEMP/apk-keys/buildio.rsa"
           test -s "$RUNNER_TEMP/apk-keys/buildio.rsa.pub"
           echo "keys_dir=$RUNNER_TEMP/apk-keys" >> "$GITHUB_OUTPUT"
+      - name: Prepare pacman signing key
+        id: pacman_signing
+        env:
+          PACMAN_GPG_PRIVATE_KEY_BASE64: ${{ secrets.PACMAN_GPG_PRIVATE_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pacman-gnupg"
+          chmod 700 "$RUNNER_TEMP/pacman-gnupg"
 
+          if [ -n "$PACMAN_GPG_PRIVATE_KEY_BASE64" ]; then
+            echo "$PACMAN_GPG_PRIVATE_KEY_BASE64" | base64 -d | GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --import
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::PACMAN_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store the fine-grained PAT with secrets:write for the buildio/cli repository as the persistent bootstrap secret (same one the APT key bootstrap uses)."
+              exit 1
+            fi
+
+            cat > "$RUNNER_TEMP/pacman-gpg-batch" <<'EOF'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Key-Usage: sign
+          Name-Real: Build.io Pacman Repository
+          Name-Email: support@build.io
+          Expire-Date: 0
+          %commit
+          EOF
+
+            GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --generate-key "$RUNNER_TEMP/pacman-gpg-batch"
+            PRIVATE_KEY_BASE64="$(GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --yes --armor --export-secret-keys | base64 | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set PACMAN_GPG_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new pacman signing key for future releases."
+          fi
+
+          KEY_FPR="$(GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          test -n "$KEY_FPR"
+          GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --yes --armor --export "$KEY_FPR" > "$RUNNER_TEMP/pacman-public-key.asc"
+          {
+            echo "key_fpr=$KEY_FPR"
+            echo "gnupg_home=$RUNNER_TEMP/pacman-gnupg"
+            echo "public_key_path=$RUNNER_TEMP/pacman-public-key.asc"
+          } >> "$GITHUB_OUTPUT"
       - name: Build Alpine package
         id: apk
         env:
@@ -129,39 +163,90 @@ jobs:
           mkdir -p arm64-artifacts
           cp "$RUNNER_TEMP/apk-build/bld-${PKGVER}.apk" arm64-artifacts/
           cp bin/linux-arm64/bld-linux-arm64.zip arm64-artifacts/
+      - name: Build pacman package
+        id: pacman
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
+        run: |
+          set -euo pipefail
 
+          VERSION="${VERSION#v}"
+          PKGVER="${VERSION}-1"
+          export PKGVER
+          BUILDDATE="$(git log -1 --pretty=format:%ct)"
+          SIZE="$(stat -c '%s' bin/linux-arm64/bld)"
+
+          mkdir -p "$RUNNER_TEMP/pacman-build/pkg/usr/bin"
+          install -m 0755 bin/linux-arm64/bld "$RUNNER_TEMP/pacman-build/pkg/usr/bin/bld"
+
+          sed \
+            -e "s/@VER@/${PKGVER}/" \
+            -e "s/@BUILDDATE@/${BUILDDATE}/" \
+            -e "s/@SIZE@/${SIZE}/" \
+            -e "s/@ARCH@/aarch64/" \
+            packaging/pacman/PKGINFO.tpl > "$RUNNER_TEMP/pacman-build/pkg/.PKGINFO"
+
+          docker run --rm \
+            -e PKGVER \
+            -v "$RUNNER_TEMP/pacman-build:/work" \
+            -w /work \
+            archlinux:base \
+            sh -c '
+              set -eu
+
+              # .MTREE (makepkg option set)
+              (
+                cd pkg
+                find . -print0 | LC_ALL=C sort -z | sed -e "s|^\./||" \
+                  | bsdtar -cnf - --format=mtree \
+                    --options="!all,use-set,type,uid,gid,mode,time,size,sha256,link" \
+                    --null --files-from - --exclude .MTREE | gzip -c -f -n > .MTREE
+              )
+
+              # Package assembly (makepkg recipe)
+              (
+                cd pkg
+                find . -print0 | LC_ALL=C sort -z | sed -e "s|^\./||" \
+                  | bsdtar --no-fflags -cnf - --null --files-from - \
+                  | zstd -q
+              ) > "bld-${PKGVER}-aarch64.pkg.tar.zst"
+            '
+
+          # Detached package signature (runner-side gpg)
+          GNUPGHOME="$GNUPG_HOME" gpg --batch --yes --detach-sign --no-armor \
+            "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst"
+
+          test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst"
+          test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst.sig"
+          echo "pkg_path=$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst" arm64-artifacts/
+          cp "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-aarch64.pkg.tar.zst.sig" arm64-artifacts/
       - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v7
         with:
           name: linux-arm64-artifacts
           path: arm64-artifacts/
           if-no-files-found: error
-
   build-linux-binary:
     needs: build-linux-arm64-binary
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
-
       - name: Install Debian packaging tools
         run: |
           sudo apt-get update
           sudo apt-get install -y aptly dpkg-dev gnupg
-
       - name: Build Linux binary
         run: |
           make build
-
       - name: Get version
         id: get_version
         run: |
@@ -170,13 +255,10 @@ jobs:
           else
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           fi
-
       - name: Create release zip
         run: |
           cd bin/linux-amd64
           zip -j bld-linux-amd64.zip bld
-
-
       - name: Build Debian package
         id: deb
         env:
@@ -200,7 +282,6 @@ jobs:
 
           echo "deb_version=${DEB_VERSION}" >> "$GITHUB_OUTPUT"
           echo "deb_path=bld_${DEB_VERSION}_amd64.deb" >> "$GITHUB_OUTPUT"
-
       - name: Prepare APK signing key
         id: apk_signing
         env:
@@ -231,7 +312,50 @@ jobs:
           test -s "$RUNNER_TEMP/apk-keys/buildio.rsa"
           test -s "$RUNNER_TEMP/apk-keys/buildio.rsa.pub"
           echo "keys_dir=$RUNNER_TEMP/apk-keys" >> "$GITHUB_OUTPUT"
+      - name: Prepare pacman signing key
+        id: pacman_signing
+        env:
+          PACMAN_GPG_PRIVATE_KEY_BASE64: ${{ secrets.PACMAN_GPG_PRIVATE_KEY_BASE64 }}
+          GH_TOKEN: ${{ secrets.APT_SECRET_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pacman-gnupg"
+          chmod 700 "$RUNNER_TEMP/pacman-gnupg"
 
+          if [ -n "$PACMAN_GPG_PRIVATE_KEY_BASE64" ]; then
+            echo "$PACMAN_GPG_PRIVATE_KEY_BASE64" | base64 -d | GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --import
+          else
+            if [ -z "$GH_TOKEN" ]; then
+              echo "::error::PACMAN_GPG_PRIVATE_KEY_BASE64 is missing and APT_SECRET_BOOTSTRAP_TOKEN is unavailable. Store the fine-grained PAT with secrets:write for the buildio/cli repository as the persistent bootstrap secret (same one the APT key bootstrap uses)."
+              exit 1
+            fi
+
+            cat > "$RUNNER_TEMP/pacman-gpg-batch" <<'EOF'
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Key-Usage: sign
+          Name-Real: Build.io Pacman Repository
+          Name-Email: support@build.io
+          Expire-Date: 0
+          %commit
+          EOF
+
+            GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --generate-key "$RUNNER_TEMP/pacman-gpg-batch"
+            PRIVATE_KEY_BASE64="$(GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --yes --armor --export-secret-keys | base64 | tr -d '\n')"
+            echo "::add-mask::$PRIVATE_KEY_BASE64"
+            printf '%s' "$PRIVATE_KEY_BASE64" | gh secret set PACMAN_GPG_PRIVATE_KEY_BASE64 --repo "$GITHUB_REPOSITORY"
+            echo "Generated and saved a new pacman signing key for future releases."
+          fi
+
+          KEY_FPR="$(GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --with-colons --fingerprint --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          test -n "$KEY_FPR"
+          GNUPGHOME="$RUNNER_TEMP/pacman-gnupg" gpg --batch --yes --armor --export "$KEY_FPR" > "$RUNNER_TEMP/pacman-public-key.asc"
+          {
+            echo "key_fpr=$KEY_FPR"
+            echo "gnupg_home=$RUNNER_TEMP/pacman-gnupg"
+            echo "public_key_path=$RUNNER_TEMP/pacman-public-key.asc"
+          } >> "$GITHUB_OUTPUT"
       - name: Build Alpine package
         id: apk
         env:
@@ -286,7 +410,63 @@ jobs:
 
           echo "apk_path=$RUNNER_TEMP/apk-build/bld-${PKGVER}.apk" >> "$GITHUB_OUTPUT"
           echo "pkgver=${PKGVER}" >> "$GITHUB_OUTPUT"
+      - name: Build pacman package
+        id: pacman
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
+        run: |
+          set -euo pipefail
 
+          VERSION="${VERSION#v}"
+          PKGVER="${VERSION}-1"
+          export PKGVER
+          BUILDDATE="$(git log -1 --pretty=format:%ct)"
+          SIZE="$(stat -c '%s' bin/linux-amd64/bld)"
+
+          mkdir -p "$RUNNER_TEMP/pacman-build/pkg/usr/bin"
+          install -m 0755 bin/linux-amd64/bld "$RUNNER_TEMP/pacman-build/pkg/usr/bin/bld"
+
+          sed \
+            -e "s/@VER@/${PKGVER}/" \
+            -e "s/@BUILDDATE@/${BUILDDATE}/" \
+            -e "s/@SIZE@/${SIZE}/" \
+            -e "s/@ARCH@/x86_64/" \
+            packaging/pacman/PKGINFO.tpl > "$RUNNER_TEMP/pacman-build/pkg/.PKGINFO"
+
+          docker run --rm \
+            -e PKGVER \
+            -v "$RUNNER_TEMP/pacman-build:/work" \
+            -w /work \
+            archlinux:base \
+            sh -c '
+              set -eu
+
+              # .MTREE (makepkg option set)
+              (
+                cd pkg
+                find . -print0 | LC_ALL=C sort -z | sed -e "s|^\./||" \
+                  | bsdtar -cnf - --format=mtree \
+                    --options="!all,use-set,type,uid,gid,mode,time,size,sha256,link" \
+                    --null --files-from - --exclude .MTREE | gzip -c -f -n > .MTREE
+              )
+
+              # Package assembly (makepkg recipe)
+              (
+                cd pkg
+                find . -print0 | LC_ALL=C sort -z | sed -e "s|^\./||" \
+                  | bsdtar --no-fflags -cnf - --null --files-from - \
+                  | zstd -q
+              ) > "bld-${PKGVER}-x86_64.pkg.tar.zst"
+            '
+
+          # Detached package signature (runner-side gpg)
+          GNUPGHOME="$GNUPG_HOME" gpg --batch --yes --detach-sign --no-armor \
+            "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst"
+
+          test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst"
+          test -s "$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst.sig"
+          echo "pkg_path=$RUNNER_TEMP/pacman-build/bld-${PKGVER}-x86_64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
       - name: Prepare APT signing key
         id: signing
         env:
@@ -350,7 +530,6 @@ jobs:
             printf '%s\n' "$PUBLIC_KEYS_BASE64"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-
       - name: Build archive keyring package
         id: keyring
         env:
@@ -383,7 +562,6 @@ jobs:
 
           echo "keyring_deb_path=buildio-archive-keyring_${DEB_VERSION}_all.deb" >> "$GITHUB_OUTPUT"
           echo "public_keys_path=apt-public-keys.asc" >> "$GITHUB_OUTPUT"
-
       - name: Verify Debian packages
         env:
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
@@ -394,13 +572,11 @@ jobs:
           dpkg-deb --contents "$DEB_PATH"
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
-
       - name: Download arm64 artifacts
         uses: actions/download-artifact@v8
         with:
           name: linux-arm64-artifacts
           path: arm64-artifacts
-
       - name: Verify Alpine packages
         env:
           APK_PATH: ${{ steps.apk.outputs.apk_path }}
@@ -444,11 +620,65 @@ jobs:
             '
           mv arm64-artifacts/bld-aarch64.apk "bld-${PKGVER}_aarch64.apk"
           cp "$APK_PATH" "bld-${PKGVER}.apk"
+      - name: Verify pacman packages
+        env:
+          GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
+          PUBLIC_KEY_PATH: ${{ steps.pacman_signing.outputs.public_key_path }}
+          KEY_FPR: ${{ steps.pacman_signing.outputs.key_fpr }}
+          PKG_PATH: ${{ steps.pacman.outputs.pkg_path }}
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          PVER="${VERSION}-1"
+          ARM_PKG="arm64-artifacts/bld-${PVER}-aarch64.pkg.tar.zst"
+          test -s "$ARM_PKG"
+          test -s "$ARM_PKG.sig"
 
+          # Stage key + both arch packages in per-arch repo dirs
+          mkdir -p pacman-verify/x86_64 pacman-verify/aarch64
+          cp "$PUBLIC_KEY_PATH" pacman-verify/k
+          cp "$PKG_PATH" "$PKG_PATH.sig" pacman-verify/x86_64/
+          cp "$ARM_PKG" "$ARM_PKG.sig" pacman-verify/aarch64/
+
+          # Build signed repo databases (repo-add --sign with the repository key)
+          docker run --rm \
+            -e GNUPGHOME=/gnupg \
+            -e KEY_FPR \
+            -v "$(pwd)/pacman-verify:/repo" \
+            -v "${GNUPG_HOME}:/gnupg" \
+            archlinux:base \
+            bash -c '
+              set -eu
+              cd /repo/x86_64
+              repo-add -s -k "$KEY_FPR" bld.db.tar.gz bld-*.pkg.tar.zst
+              cd ../aarch64
+              repo-add -s -k "$KEY_FPR" bld.db.tar.gz bld-*.pkg.tar.zst
+            '
+
+          # Verify like a user, per arch: trust key, install from repo, run the binary
+          for ARCH in x86_64 aarch64; do
+            PLATFORM_ARGS=()
+            [ "$ARCH" = aarch64 ] && PLATFORM_ARGS=(--platform linux/arm64)
+            docker run --rm \
+              "${PLATFORM_ARGS[@]}" \
+              -e KEY_FPR -e ARCH \
+              -v "$(pwd)/pacman-verify:/repo:ro" \
+              archlinux:base \
+              bash -c '
+                set -eu
+                pacman-key --init
+                pacman-key --add /repo/k
+                pacman-key --lsign-key "$KEY_FPR"
+                printf "[bld]\nSigLevel = Required\nServer = file:///repo/%s\n" "$ARCH" >> /etc/pacman.conf
+                pacman -Sy --noconfirm bld
+                BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
+                pacman -Qi bld | head -5
+              '
+          done
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: 10.0.x
       - name: Publish APT and Chocolatey repository
         env:
           APT_GPG_KEY_ID: ${{ steps.signing.outputs.key_id }}
@@ -459,6 +689,9 @@ jobs:
           DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
           KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
           PUBLIC_KEYS_PATH: ${{ steps.keyring.outputs.public_keys_path }}
+          PACMAN_GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
+          PACMAN_PKG_PATH: ${{ steps.pacman.outputs.pkg_path }}
+          PACMAN_KEY_FPR: ${{ steps.pacman_signing.outputs.key_fpr }}
         run: |
           set -euo pipefail
           : "${APT_GPG_KEY_ID:?APT_GPG_KEY_ID is required}"
@@ -569,6 +802,41 @@ jobs:
           cp -a "$RUNNER_TEMP/apk-repo/aarch64" public-pages/apk/aarch64
           cp "$APK_KEYS_DIR/buildio.rsa.pub" public-pages/apk/buildio.rsa.pub
 
+          # --- pacman repositories: retain all published packages, rebuild, sign ---
+          rm -rf "$RUNNER_TEMP/pacman-repo"
+          for ARCH in x86_64 aarch64; do
+            mkdir -p "$RUNNER_TEMP/pacman-repo/$ARCH"
+            if [ -d "public-pages/pacman/$ARCH" ]; then
+              cp "public-pages/pacman/$ARCH"/bld-*.pkg.tar.zst "$RUNNER_TEMP/pacman-repo/$ARCH/" 2>/dev/null || true
+              cp "public-pages/pacman/$ARCH"/bld-*.pkg.tar.zst.sig "$RUNNER_TEMP/pacman-repo/$ARCH/" 2>/dev/null || true
+            fi
+          done
+          cp "$PACMAN_PKG_PATH" "$PACMAN_PKG_PATH.sig" "$RUNNER_TEMP/pacman-repo/x86_64/"
+          PVER="${PKGVER%-r0}-1"
+          cp "arm64-artifacts/bld-${PVER}-aarch64.pkg.tar.zst" "$RUNNER_TEMP/pacman-repo/aarch64/"
+          cp "arm64-artifacts/bld-${PVER}-aarch64.pkg.tar.zst.sig" "$RUNNER_TEMP/pacman-repo/aarch64/"
+
+          docker run --rm \
+            -e GNUPGHOME=/gnupg \
+            -e KEY_FPR \
+            -v "$RUNNER_TEMP/pacman-repo:/repo" \
+            -v "$PACMAN_GNUPG_HOME:/gnupg" \
+            archlinux:base \
+            bash -c '
+              set -eu
+              for ARCH in x86_64 aarch64; do
+                cd "/repo/$ARCH"
+                repo-add -s -k "$KEY_FPR" bld.db.tar.gz bld-*.pkg.tar.zst
+              done
+            '
+
+          rm -rf public-pages/pacman
+          mkdir -p public-pages/pacman
+          cp -a "$RUNNER_TEMP/pacman-repo/x86_64" public-pages/pacman/x86_64
+          cp -a "$RUNNER_TEMP/pacman-repo/aarch64" public-pages/pacman/aarch64
+          cp "$PUBLIC_KEYS_PATH" public-pages/pacman/k
+          printf '%s\n' "$PACMAN_KEY_FPR" > public-pages/pacman/f
+
           rm -rf public-pages/apt
           cp -a "$APTLY_ROOT/public/apt" public-pages/apt
           python3 - <<'PY' > public-pages/install.sh
@@ -597,10 +865,9 @@ jobs:
           chmod 0755 public-pages/install.sh
           touch public-pages/.nojekyll
 
-          git -C public-pages add apt apk install.sh .nojekyll
+          git -C public-pages add apt apk pacman install.sh .nojekyll
           git -C public-pages commit -m "Publish APT package ${DEB_VERSION} and APK package ${PKGVER}" || true
           git -C public-pages push origin HEAD:gh-pages
-
       - name: Build release body
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
@@ -627,7 +894,6 @@ jobs:
           print()
           print(install)
           PY
-
       - name: Create or update release
         uses: softprops/action-gh-release@v3
         with:
@@ -641,6 +907,8 @@ jobs:
             ${{ steps.keyring.outputs.keyring_deb_path }}
             bld-${{ steps.apk.outputs.pkgver }}.apk
             bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk
+            pacman-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst
+            pacman-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
@@ -650,21 +918,16 @@ jobs:
     name: Build Flatpak
     needs: build-linux-binary
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
-
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
-
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
       - name: Download Linux binary release attachment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -677,7 +940,6 @@ jobs:
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --output packaging/flatpak/bld-linux-amd64.zip \
             "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bld-linux-amd64.zip"
-
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -686,7 +948,6 @@ jobs:
           arch: x86_64
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
-
       - name: Attach Flatpak to release
         uses: softprops/action-gh-release@v3
         with:
