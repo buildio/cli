@@ -531,12 +531,17 @@ jobs:
           rm -rf "$RUNNER_TEMP/apk-repo"
           for ARCH in x86_64 aarch64; do
             mkdir -p "$RUNNER_TEMP/apk-repo/$ARCH"
+            # Retain only conventional name-version.apk files; apk fetches
+            # ${arch}/${name}-${version}.apk, anything else is unreachable.
             if [ -d "public-pages/apk/$ARCH" ]; then
-              cp "public-pages/apk/$ARCH"/*.apk "$RUNNER_TEMP/apk-repo/$ARCH/" 2>/dev/null || true
+              cp "public-pages/apk/$ARCH"/bld-*.apk "$RUNNER_TEMP/apk-repo/$ARCH/" 2>/dev/null || true
+              rm -f "$RUNNER_TEMP/apk-repo/$ARCH"/*_aarch64.apk
             fi
           done
           cp "$APK_PATH" "$RUNNER_TEMP/apk-repo/x86_64/"
-          cp "bld-${PKGVER}_aarch64.apk" "$RUNNER_TEMP/apk-repo/aarch64/"
+          # apk fetches ${arch}/${name}-${version}.apk; the _aarch64 suffix is
+          # release-asset naming only, so use the conventional name in the repo
+          cp "bld-${PKGVER}_aarch64.apk" "$RUNNER_TEMP/apk-repo/aarch64/bld-${PKGVER}.apk"
 
           docker run --rm \
             -v "$RUNNER_TEMP/apk-repo:/repo" \
