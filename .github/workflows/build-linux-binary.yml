@@ -688,6 +688,7 @@ jobs:
               set -eu
               apk add --no-cache gnupg libarchive-tools >/dev/null
               cd /repo/aarch64
+              gpg --import ../k
               gpg --verify bld-*.pkg.tar.zst.sig bld-*.pkg.tar.zst
               bsdtar -tf bld-*.pkg.tar.zst | grep -qx ".PKGINFO"
               bsdtar -xOqf bld-*.pkg.tar.zst .PKGINFO | grep -qx "arch = aarch64"
