@@ -201,7 +201,7 @@ jobs:
               # .MTREE (makepkg option set; entry layout matches real packages)
               (
                 cd pkg
-                find . -mindepth 1 -print0 | LC_ALL=C sort -z | sed -z "s|^\./||" \
+                find . -mindepth 1 | LC_ALL=C sort | sed "s|^\./||" | tr "\n" "\0" \
                   | bsdtar -cnf - --format=mtree \
                     --options="!all,use-set,type,uid,gid,mode,time,size,sha256,link" \
                     --null --files-from - --exclude .MTREE | gzip -c -f -n > .MTREE
@@ -210,7 +210,7 @@ jobs:
               # Package assembly (makepkg recipe)
               (
                 cd pkg
-                find . -mindepth 1 -print0 | LC_ALL=C sort -z | sed -z "s|^\./||" \
+                find . -mindepth 1 | LC_ALL=C sort | sed "s|^\./||" | tr "\n" "\0" \
                   | bsdtar --no-fflags -cnf - --null --files-from - \
                   | zstd -q
               ) > "bld-${PKGVER}-aarch64.pkg.tar.zst"
@@ -451,7 +451,7 @@ jobs:
               # .MTREE (makepkg option set; entry layout matches real packages)
               (
                 cd pkg
-                find . -mindepth 1 -print0 | LC_ALL=C sort -z | sed -z "s|^\./||" \
+                find . -mindepth 1 | LC_ALL=C sort | sed "s|^\./||" | tr "\n" "\0" \
                   | bsdtar -cnf - --format=mtree \
                     --options="!all,use-set,type,uid,gid,mode,time,size,sha256,link" \
                     --null --files-from - --exclude .MTREE | gzip -c -f -n > .MTREE
@@ -460,7 +460,7 @@ jobs:
               # Package assembly (makepkg recipe)
               (
                 cd pkg
-                find . -mindepth 1 -print0 | LC_ALL=C sort -z | sed -z "s|^\./||" \
+                find . -mindepth 1 | LC_ALL=C sort | sed "s|^\./||" | tr "\n" "\0" \
                   | bsdtar --no-fflags -cnf - --null --files-from - \
                   | zstd -q
               ) > "bld-${PKGVER}-x86_64.pkg.tar.zst"
