@@ -544,6 +544,8 @@ jobs:
             alpine:3.24 \
             sh -c '
               set -eu
+              # apk-tools 3 verifies each input package against /etc/apk/keys/
+              cp /keys/buildio.rsa.pub /etc/apk/keys/
               apk add --no-cache abuild >/dev/null
               for ARCH in x86_64 aarch64; do
                 apk index \
