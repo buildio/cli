@@ -73,7 +73,7 @@ sudo apk update&&sudo apk add bld
 ### Linux (pacman)
 
 ```bash
-sudo sh -c 'u=https://$0.github.io/cli/$1;p=$1-key;curl -fsSL $u/$1.asc|$p -a -;$p --lsign-key $(curl -fsSL $u/f);printf "[bld]\nServer=$u/$arch\n">>/etc/$1.conf' buildio pacman
+sudo sh -c 'u=https://$0.github.io/cli/$1;p=$1-key;c="curl -fsSL";$c $u/$1.asc|$p -a -;$p --lsign-key $($c $u/f);printf "[bld]\nServer=$u/$arch\n">>/etc/$1.conf' buildio pacman
 sudo pacman -Sy bld
 ```
 
