@@ -75,6 +75,15 @@ sudo sh -c 'u=https://$0.github.io/cli/$1;$2 $u/k|$1-key -a -;$1-key --lsign-key
 sudo pacman -Sy bld
 ```
 
+### Linux (RPM)
+
+```bash
+sudo sh -c 'u=https://$0.github.io/cli/rpm;printf "[bld]\nbaseurl=$u/$basearch\ngpgcheck=1\ngpgkey=$u/k\n">>/etc/yum.repos.d/$0-cli.repo' buildio
+sudo dnf install -y bld
+```
+
+On older RPM systems (RHEL/CentOS 7, Amazon Linux 2), use `yum install -y bld` instead of `dnf`.
+
 ## Build
 
 ### Local Development Build
@@ -84,7 +93,7 @@ shards build
 
 ### Release Builds
 
-The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binaries, Debian packages, the APT repository, the Alpine packages, the APK repositories, the pacman packages, and the pacman repositories. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT, APK, pacman, and MacPorts repositories are published to GitHub Pages. These actions:
+The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binaries, Debian packages, the APT repository, the Alpine packages, the APK repositories, the pacman packages, the pacman repositories, the RPM packages, and the RPM repositories. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT, APK, pacman, RPM, and MacPorts repositories are published to GitHub Pages. These actions:
 
 - **Purpose**: Creates a completely static Linux binary using Alpine Linux for maximum portability
 - **Use Cases**:
@@ -92,7 +101,7 @@ The repository includes GitHub Actions that build release artifacts when a versi
   - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
 - **Trigger**: Automatically runs when pushing tags like `v1.1.6`
 - **Build Process**: Uses Docker with Alpine Linux for the static Linux binary (natively on both amd64 and arm64 runners, so no emulation is needed for compilation), and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`; Intel binaries request `MACOSX_DEPLOYMENT_TARGET=10.7` for Lion and newer, while Apple Silicon binaries target macOS 11.0 and newer
-- **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, `bld_<version>-r0_aarch64.apk`, `bld_<version>-1-x86_64.pkg.tar.zst`, and `bld_<version>-1-aarch64.pkg.tar.zst` package assets; the APK and pacman repositories serve both `x86_64` and `aarch64`, so the same install steps work on both architectures
+- **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, `bld_<version>-r0_aarch64.apk`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-aarch64.pkg.tar.zst`, `bld_<version>-1.x86_64.rpm`, and `bld_<version>-1.aarch64.rpm` package assets; the APK, pacman, and RPM repositories serve both `x86_64` and `aarch64`, so the same install steps work on both architectures
 
 To trigger a new release:
 
@@ -106,6 +115,8 @@ APT publishing needs a stable GPG signing key because users' `apt` clients trust
 APK publishing needs a stable RSA signing key because users' `apk` clients trust the repository through `/etc/apk/keys/buildio.rsa.pub`. The workflow bootstraps that key automatically when `APK_SIGNING_KEY_BASE64` is missing: it generates a 4096-bit key named `buildio.rsa`, uses it for the current publish, and saves `APK_SIGNING_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The key has no expiry (apk's raw RSA signatures carry no certificate layer), so rotation happens only on compromise. On rotation, keep the old public key in the publish keys so previously published packages keep verifying, and users re-run the same `/etc/apk/keys` curl from the README.
 
 Pacman publishing needs a stable GPG signing key because users' `pacman` clients trust the repository through `pacman-key` (import + local sign of the key fingerprint). The workflow bootstraps that key automatically when `PACMAN_GPG_PRIVATE_KEY_BASE64` is missing: it generates a 4096-bit RSA key for "Build.io Pacman Repository", uses it for the current publish, and saves `PACMAN_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The key is published at `pacman/k` and its fingerprint at `pacman/f`, so the install setup can feed both to `pacman-key` without manual copy-paste.
+
+RPM publishing needs a stable GPG signing key because users' `dnf`/`yum` clients verify packages through the repository's `gpgcheck` and the repository metadata through `repo_gpgcheck`. The workflow bootstraps that key automatically when `RPM_GPG_PRIVATE_KEY_BASE64` is missing (same pattern as the other repository keys, persisted through `APT_SECRET_BOOTSTRAP_TOKEN`). Packages carry embedded signatures via `rpmsign`, the repository `repodata/repomd.xml` carries a detached signature, and the public key is published at `rpm/k`. The `.repo` stanza points `gpgkey=` at it, so `dnf` imports the key automatically on first install; older `yum` users import it with `rpm --import` when prompted.
 
 MacPorts publishing uses a Signify signature because `port sync` verifies HTTPS ports tree snapshots before extracting them. The macOS workflow bootstraps `MACPORTS_SIGNIFY_PRIVATE_KEY_BASE64` and `MACPORTS_SIGNIFY_PUBLIC_KEY_BASE64` through the same `APT_SECRET_BOOTSTRAP_TOKEN` secret when they are missing, publishes `macports/ports.tar`, signs it as `macports/ports.tar.sig`, and publishes `macports/buildio-ports.pub` for users to add to `pubkeys.conf`. The Portfile installs precompiled `bld-darwin-amd64.tar.gz` or `bld-darwin-arm64.tar.gz` release assets; it does not build the CLI from source on user machines. The Intel artifact requests the oldest 64-bit Intel deployment target, macOS 10.7 Lion, and the workflow fails if the produced binary reports a newer minimum target.
 
