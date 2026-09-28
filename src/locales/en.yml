@@ -110,12 +110,12 @@ en:
       plans:
         description: "List plans for an addon service."
         arguments:
-          service: "Addon service name (e.g. bld-postgres)."
+          service: "Addon service name (e.g. schematogo)."
         help: "List available plans for an addon service."
       create:
         description: "Create an addon for an app."
         arguments:
-          plan: "Addon service and plan (e.g. bld-postgres:essential-0)."
+          plan: "Addon service and plan (e.g. schematogo:basic)."
         options:
           name: "Custom name for the addon."
           human_name: "Display name for the addon."
