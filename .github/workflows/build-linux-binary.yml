@@ -911,7 +911,7 @@ jobs:
               for ARCH in x86_64 aarch64; do
                 cd "/repo/$ARCH"
                 createrepo_c .
-                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --no-armor repodata/repomd.xml
+                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --armor repodata/repomd.xml
               done
             '
 
@@ -1121,7 +1121,7 @@ jobs:
               for ARCH in x86_64 aarch64; do
                 cd "/repo/$ARCH"
                 createrepo_c .
-                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --no-armor repodata/repomd.xml
+                GNUPGHOME=/gnupg gpg --batch --yes --detach-sign --armor repodata/repomd.xml
               done
             '
 
