@@ -1,14 +1,25 @@
 name: Build macOS Binary
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build
+        required: true
+        type: string
+      ref:
+        description: Commit to build
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.1.6)'
+        description: Version to build (e.g., 1.1.6)
         required: true
+        type: string
+      ref:
+        description: Optional commit to build
+        required: false
         type: string
 
 env:
@@ -38,6 +49,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install MacPorts
         run: |
@@ -128,6 +141,7 @@ jobs:
           name: bld-darwin-${{ matrix.asset_arch }}
           path: bin/darwin-${{ matrix.asset_arch }}/bld-darwin-${{ matrix.asset_arch }}.tar.gz
           if-no-files-found: error
+          retention-days: 1
 
   publish-macos-binaries:
     needs: build-macos-binaries
@@ -137,16 +151,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
 
       - name: Get version
         id: get_version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "VERSION=${{ inputs.version || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Download macOS binary artifacts
         uses: actions/download-artifact@v4
@@ -237,15 +248,17 @@ jobs:
           git -C public-pages commit -m "Publish MacPorts package ${VERSION}" || true
           git -C public-pages push origin HEAD:gh-pages
 
-      - name: Upload macOS binaries to release
-        uses: softprops/action-gh-release@v3
+      - name: Stage macOS release artifacts
+        run: |
+          set -euo pipefail
+          rm -rf release-artifacts
+          mkdir -p release-artifacts
+          cp dist/bld-darwin-amd64.tar.gz release-artifacts/
+          cp dist/bld-darwin-arm64.tar.gz release-artifacts/
+      - name: Upload macOS release artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          files: |
-            dist/bld-darwin-amd64.tar.gz
-            dist/bld-darwin-arm64.tar.gz
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: macos-release-artifacts
+          path: release-artifacts/
+          retention-days: 1
+          if-no-files-found: error

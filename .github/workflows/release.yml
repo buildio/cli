@@ -8,10 +8,16 @@ on:
 concurrency:
   group: cli-release
   cancel-in-progress: false
+permissions:
+  contents: write
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.bare }}
+      ref: ${{ steps.commit.outputs.ref }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -32,7 +38,7 @@ jobs:
             "https://api.github.com/repos/buildio/sdk-crystal-lang/tags" \
             | jq -r '[.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0].name' \
             | sed 's/^v//')
-          echo "version=$SDK_VER" >> $GITHUB_OUTPUT
+          echo "version=$SDK_VER" >> "$GITHUB_OUTPUT"
           echo "SDK version: $SDK_VER"
 
       - name: Determine next version
@@ -63,7 +69,8 @@ jobs:
         uses: crystal-lang/install-crystal@v1
       - run: shards update
 
-      - name: Commit, tag, and push
+      - name: Commit release source
+        id: commit
         env:
           NEXT_TAG: ${{ steps.version.outputs.tag }}
           SDK_VER: ${{ steps.sdk.outputs.version }}
@@ -72,11 +79,121 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "Release ${NEXT_TAG}, SDK ${SDK_VER}"
           fi
-          git tag "${NEXT_TAG}"
-          git push origin main --tags
+          git push origin main
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-          # Export for downstream steps
-          echo "RELEASE_TAG=${NEXT_TAG}" >> $GITHUB_ENV
+  build-linux:
+    needs: prepare
+    uses: ./.github/workflows/build-linux-binary.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+    secrets: inherit
+
+  build-macos:
+    needs: prepare
+    uses: ./.github/workflows/build-macos-binary.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+    secrets: inherit
+
+  build-windows:
+    needs: prepare
+    uses: ./.github/workflows/build-windows-binary.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ref: ${{ needs.prepare.outputs.ref }}
+    secrets: inherit
+
+  publish:
+    needs: [prepare, build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: '*-release-artifacts'
+          path: dist
+          merge-multiple: true
+
+      - name: Build release body
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > release-body.md
+          from pathlib import Path
+          import os
+          import sys
+
+          readme = Path("README.md").read_text()
+          lines = readme.splitlines()
+
+          start = next((i for i, line in enumerate(lines) if line == "## Install"), None)
+          if start is None:
+              sys.exit("README.md is missing a ## Install section")
+
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+          install = "\n".join(lines[start:end]).strip()
+          if not install:
+              sys.exit("README.md ## Install section is empty")
+
+          print(f"Release of version {os.environ['VERSION']}")
+          print()
+          print(install)
+          PY
+
+      - name: Create release tag
+        env:
+          RELEASE_REF: ${{ needs.prepare.outputs.ref }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch --tags
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Release tag $RELEASE_TAG already exists"
+            exit 1
+          fi
+          git tag "$RELEASE_TAG" "$RELEASE_REF"
+          git push origin "$RELEASE_TAG"
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Release ${{ needs.prepare.outputs.tag }}
+          body_path: release-body.md
+          files: |
+            dist/bld-linux-amd64.zip
+            dist/bld-linux-arm64.zip
+            dist/bld-linux-amd64.flatpak
+            dist/bld-darwin-amd64.tar.gz
+            dist/bld-darwin-arm64.tar.gz
+            dist/bld-windows-amd64.zip
+            dist/bld_${{ needs.prepare.outputs.version }}-1_amd64.deb
+            dist/buildio-archive-keyring_${{ needs.prepare.outputs.version }}-1_all.deb
+            dist/bld-${{ needs.prepare.outputs.version }}-r0.apk
+            dist/bld-${{ needs.prepare.outputs.version }}-r0_aarch64.apk
+            dist/bld-${{ needs.prepare.outputs.version }}-1-x86_64.pkg.tar.zst
+            dist/bld-${{ needs.prepare.outputs.version }}-1-aarch64.pkg.tar.zst
+            dist/bld-${{ needs.prepare.outputs.version }}-1-x86_64.rpm
+            dist/bld-${{ needs.prepare.outputs.version }}-1-aarch64.rpm
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Dispatch to Homebrew
         uses: peter-evans/repository-dispatch@v3
@@ -84,4 +201,4 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
           repository: buildio/homebrew-cli
           event-type: cli-released
-          client-payload: '{"tag": "${{ env.RELEASE_TAG }}"}'
+          client-payload: '{"tag": "${{ needs.prepare.outputs.tag }}"}'

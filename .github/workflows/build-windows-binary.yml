@@ -1,14 +1,25 @@
 name: Build Windows Binary
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build
+        required: true
+        type: string
+      ref:
+        description: Commit to build
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.1.6)'
+        description: Version to build (e.g., 1.1.6)
         required: true
+        type: string
+      ref:
+        description: Optional commit to build
+        required: false
         type: string
 
 permissions:
@@ -21,6 +32,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - name: Setup MinGW UCRT64 toolchain
         uses: msys2/setup-msys2@v2
         with:
@@ -70,12 +83,7 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            echo "VERSION=${{ github.event.inputs.version }}" >> $env:GITHUB_OUTPUT
-          } else {
-            $tag = "${{ github.ref }}" -replace 'refs/tags/v', ''
-            echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
-          }
+          echo "VERSION=${{ inputs.version || github.ref_name }}" >> $env:GITHUB_OUTPUT
         shell: powershell
 
       - name: Create release zips
@@ -135,20 +143,16 @@ jobs:
           }
         shell: powershell
 
-      - name: Upload Windows binary to release
-        uses: softprops/action-gh-release@v3
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          files: |
-            bin/windows-amd64/bld-windows-amd64.zip
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: windows-release-artifacts
+          path: bin/windows-amd64/bld-windows-amd64.zip
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Update Scoop manifest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_call'
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
@@ -181,7 +185,7 @@ jobs:
         shell: pwsh
 
       - name: Update Chocolatey manifest
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_call'
         env:
           VERSION: ${{ steps.get_version.outputs.VERSION }}
         shell: pwsh

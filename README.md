@@ -93,21 +93,20 @@ shards build
 
 ### Release Builds
 
-The repository includes GitHub Actions that build release artifacts when a version tag is pushed. `.github/workflows/build-linux-binary.yml` builds the static Linux binaries, Debian packages, the APT repository, the Alpine packages, the APK repositories, the pacman packages, the pacman repositories, the RPM packages, and the RPM repositories. `.github/workflows/build-macos-binary.yml` builds precompiled macOS binaries for MacPorts and publishes the MacPorts ports snapshot. The APT, APK, pacman, RPM, and MacPorts repositories are published to GitHub Pages. These actions:
+The repository includes GitHub Actions that build release artifacts before creating the version tag. The `Release CLI` workflow prepares the release source, invokes the reusable Linux, macOS, and Windows build workflows, waits for every artifact and validation job to succeed, then creates the tag and GitHub release. The platform workflows build the static Linux binaries, Debian packages, the APT repository, the Alpine packages, the APK repositories, the pacman packages, the pacman repositories, the RPM packages, the RPM repositories, precompiled macOS binaries for MacPorts, and the Windows package artifacts. The APT, APK, pacman, RPM, and MacPorts repositories are published to GitHub Pages.
 
 - **Purpose**: Creates a completely static Linux binary using Alpine Linux for maximum portability
 - **Use Cases**:
   - Provides an easy-to-use binary for Linux users without Crystal dependencies
   - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
-- **Trigger**: Automatically runs when pushing tags like `v1.1.6`
+- **Trigger**: The `Release CLI` workflow runs from the SDK update dispatch or manual workflow dispatch; the tag is created only after all release artifacts pass validation
 - **Build Process**: Uses Docker with Alpine Linux for the static Linux binary (natively on both amd64 and arm64 runners, so no emulation is needed for compilation), and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`; Intel binaries request `MACOSX_DEPLOYMENT_TARGET=10.7` for Lion and newer, while Apple Silicon binaries target macOS 11.0 and newer
 - **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, `bld_<version>-r0_aarch64.apk`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-aarch64.pkg.tar.zst`, `bld_<version>-1.x86_64.rpm`, and `bld_<version>-1.aarch64.rpm` package assets; the APK, pacman, and RPM repositories serve both `x86_64` and `aarch64`, so the same install steps work on both architectures
 
-To trigger a new release:
+To trigger a new release manually:
 
 ```bash
-git tag v1.1.7
-git push origin v1.1.7
+gh workflow run release.yml
 ```
 
 APT publishing needs a stable GPG signing key because users' `apt` clients trust the repository through `/usr/share/keyrings/buildio-archive-keyring.gpg`. The workflow bootstraps that key automatically when `APT_GPG_PRIVATE_KEY_BASE64` is missing: it generates a repository signing key, uses it for the current publish, and saves `APT_GPG_PRIVATE_KEY_BASE64` through the persistent `APT_SECRET_BOOTSTRAP_TOKEN` secret. The signing key ID is derived from the imported private key on each run, so there is no separate key-id secret. The public key bundle is derived from the signing key by default; set the repository variable `APT_GPG_PUBLIC_KEYS_BASE64` only when planned rotation needs an old+new armored public-key bundle. Keeping `APT_SECRET_BOOTSTRAP_TOKEN` lets the workflow update APT signing secrets during future bootstrap/rotation work without another manual token handoff. To seed it, open GitHub's official fine-grained PAT form with prefilled owner/expiration/permission fields, select only the `buildio/cli` repository manually, generate the token, paste it into the prompt, and store it with `open 'https://github.com/settings/personal-access-tokens/new?name=Build.io+APT+bootstrap&description=Persistent+token+used+by+the+Build+CLI+release+workflow+to+store+and+rotate+APT+signing+secrets&target_name=buildio&expires_in=none&secrets=write' && read -rsp 'Paste fine-grained PAT: ' APT_SECRET_BOOTSTRAP_TOKEN && echo && gh secret set APT_SECRET_BOOTSTRAP_TOKEN --repo buildio/cli --body "$APT_SECRET_BOOTSTRAP_TOKEN"`. GitHub documents `target_name` as the resource owner, not as a selected repository, so the repository selection remains manual. The `buildio-archive-keyring` package owns `/usr/share/keyrings/buildio-archive-keyring.gpg`, so publish old+new public keys while the old key still signs the repository, let users update, then switch the private-key secret to the new signing key.
