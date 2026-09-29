@@ -19,14 +19,14 @@ master_sites        https://github.com/buildio/cli/releases/download/v${version}
 
 if {${build_arch} eq "arm64"} {
     distname        bld-darwin-arm64
-    checksums       rmd160  76726aa401b403592dfcf05020dca7bab936269f \
-                    sha256  d9b97e3feba2c9e90517059ccfbc36217ec1b369eb186afc2b515375704bcdfb \
+    checksums       rmd160  4ba4bd6eafdefa758acb2a661634d8ae68312c37 \
+                    sha256  227ce9983574f5aeb18a07d0ab865ebbb2f4b1f99a5c0f38a3a6c873ae88ede9 \
                     size    1385566
 } elseif {${build_arch} eq "x86_64"} {
     distname        bld-darwin-amd64
-    checksums       rmd160  b6be4e8e50876755a3151a4870a7292839d489c0 \
-                    sha256  b3ec25090da8f0640b0a20959bfce99113815d379cae947ab56dc6525aeba8d9 \
-                    size    1390836
+    checksums       rmd160  f45c6a179c4b1f4e8a59a06e0184219afbf75dc6 \
+                    sha256  72e1b741ca73c2c4aacfe24d1412c8facaf82f40730bf673cefdc710e4d9cd29 \
+                    size    1390834
 } else {
     known_fail      yes
     pre-fetch {
