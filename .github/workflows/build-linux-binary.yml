@@ -312,6 +312,7 @@ jobs:
               set -eu
               dnf install -y rpm-build >/dev/null
               mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+              mv SOURCES/bld rpmbuild/SOURCES/bld
               mv bld.spec rpmbuild/SPECS/
               rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/aarch64/bld-*.rpm /work/
@@ -642,6 +643,7 @@ jobs:
               set -eu
               dnf install -y rpm-build >/dev/null
               mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+              mv SOURCES/bld rpmbuild/SOURCES/bld
               mv bld.spec rpmbuild/SPECS/
               rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/x86_64/bld-*.rpm /work/
