@@ -24,6 +24,10 @@ jobs:
           fetch-depth: 0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+      - name: Install RPM signing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
       - name: Build Linux binary
         run: |
           make build PLATFORM=linux/arm64
@@ -329,7 +333,7 @@ jobs:
       - name: Install Debian packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y aptly dpkg-dev gnupg
+          sudo apt-get install -y aptly dpkg-dev gnupg rpm
       - name: Build Linux binary
         run: |
           make build
