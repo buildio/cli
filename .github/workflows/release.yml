@@ -187,8 +187,8 @@ jobs:
             dist/bld-${{ needs.prepare.outputs.version }}-r0_aarch64.apk
             dist/bld-${{ needs.prepare.outputs.version }}-1-x86_64.pkg.tar.zst
             dist/bld-${{ needs.prepare.outputs.version }}-1-aarch64.pkg.tar.zst
-            dist/bld-${{ needs.prepare.outputs.version }}-1-x86_64.rpm
-            dist/bld-${{ needs.prepare.outputs.version }}-1-aarch64.rpm
+            dist/bld-${{ needs.prepare.outputs.version }}-1.x86_64.rpm
+            dist/bld-${{ needs.prepare.outputs.version }}-1.aarch64.rpm
           draft: false
           prerelease: false
           fail_on_unmatched_files: true

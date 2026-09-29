@@ -1107,7 +1107,7 @@ jobs:
             fi
           done
           cp "$RPM_PKG_PATH" "$RUNNER_TEMP/rpm-repo/x86_64/"
-          cp "arm64-artifacts/bld-${PKGVER%-r0}-1-aarch64.rpm" "$RUNNER_TEMP/rpm-repo/aarch64/"
+          cp "arm64-artifacts/bld-${PKGVER%-r0}-1.aarch64.rpm" "$RUNNER_TEMP/rpm-repo/aarch64/"
 
           docker run --rm \
             -e GNUPGHOME=/gnupg \
@@ -1175,8 +1175,8 @@ jobs:
           cp "bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk" release-artifacts/
           cp "pacman-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst" release-artifacts/
           cp "pacman-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst" release-artifacts/
-          cp "rpm-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.rpm" release-artifacts/
-          cp "rpm-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.rpm" release-artifacts/
+          cp "rpm-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1.x86_64.rpm" release-artifacts/
+          cp "rpm-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1.aarch64.rpm" release-artifacts/
       - name: Upload Linux release artifacts
         uses: actions/upload-artifact@v4
         with:
