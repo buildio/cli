@@ -921,7 +921,7 @@ jobs:
             [ "$ARCH" = aarch64 ] && PLATFORM_ARGS=(--platform linux/arm64)
             docker run --rm \
               "${PLATFORM_ARGS[@]}" \
-              -e ARCH \
+              -e ARCH="$ARCH" \
               -v "$(pwd)/rpm-verify:/repo:ro" \
               fedora:46 \
               bash -c '
