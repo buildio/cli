@@ -394,7 +394,8 @@ jobs:
           & $sleet push `
             $nupkgPath `
             --config $sleetConfig `
-            --source buildio
+            --source buildio `
+            --force
 
           if ($LASTEXITCODE -ne 0) {
             throw "Sleet push failed"
