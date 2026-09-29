@@ -296,8 +296,8 @@ jobs:
 
           VERSION="${VERSION#v}"
 
-          mkdir -p "$RUNNER_TEMP/rpm-build/SOURCES"
-          install -m 0755 bin/linux-arm64/bld "$RUNNER_TEMP/rpm-build/SOURCES/bld"
+          mkdir -p "$RUNNER_TEMP/rpm-build/rpmbuild/SOURCES"
+          install -m 0755 bin/linux-arm64/bld "$RUNNER_TEMP/rpm-build/rpmbuild/SOURCES/bld"
 
           sed \
             -e "s/@VERSION@/${VERSION}/" \
@@ -313,7 +313,7 @@ jobs:
               dnf install -y rpm-build >/dev/null
               mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
               mv bld.spec rpmbuild/SPECS/
-              rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
+              rpmbuild -bb --define "_topdir /work/rpmbuild" --define "dist %{nil}" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/aarch64/bld-*.rpm /work/
             '
 
@@ -626,8 +626,8 @@ jobs:
 
           VERSION="${VERSION#v}"
 
-          mkdir -p "$RUNNER_TEMP/rpm-build/SOURCES"
-          install -m 0755 bin/linux-amd64/bld "$RUNNER_TEMP/rpm-build/SOURCES/bld"
+          mkdir -p "$RUNNER_TEMP/rpm-build/rpmbuild/SOURCES"
+          install -m 0755 bin/linux-amd64/bld "$RUNNER_TEMP/rpm-build/rpmbuild/SOURCES/bld"
 
           sed \
             -e "s/@VERSION@/${VERSION}/" \
@@ -643,7 +643,7 @@ jobs:
               dnf install -y rpm-build >/dev/null
               mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
               mv bld.spec rpmbuild/SPECS/
-              rpmbuild -bb --define "_topdir /work/rpmbuild" rpmbuild/SPECS/bld.spec >/dev/null
+              rpmbuild -bb --define "_topdir /work/rpmbuild" --define "dist %{nil}" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/x86_64/bld-*.rpm /work/
             '
 
