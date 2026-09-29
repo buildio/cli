@@ -3,6 +3,22 @@ Priority: optional
 Section: misc
 Maintainer: Build.io <support@build.io>
 Architecture: all
+Version: 1.1.141-1
+Filename: pool/main/b/buildio-archive-keyring/buildio-archive-keyring_1.1.141-1_all.deb
+Size: 2778
+MD5sum: 79acc2c042f7ea4a3194f76151e6388d
+SHA1: f73e68b031a6686aec0506c60d2b2745c661d650
+SHA256: 5d29fee96359e7ade541cc02529883879307161962fb66889b822cd4944638fe
+SHA512: fc5c0e7e7ff5281f10804ed60c7661123793adfcdcf5d08133ff6eba01fa487882737ddb1f1dfef8e0607cb55b24608938ada3c85646a499a247c8b119c42174
+Description: Build.io APT archive signing keyring
+ Public signing keys used by the Build.io CLI APT repository.
+Homepage: https://app.build.io
+
+Package: buildio-archive-keyring
+Priority: optional
+Section: misc
+Maintainer: Build.io <support@build.io>
+Architecture: all
 Version: 1.1.138-1
 Filename: pool/main/b/buildio-archive-keyring/buildio-archive-keyring_1.1.138-1_all.deb
 Size: 2780
