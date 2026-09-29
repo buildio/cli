@@ -305,6 +305,7 @@ jobs:
             packaging/rpm/bld.spec.tpl > "$RUNNER_TEMP/rpm-build/bld.spec"
 
           docker run --rm \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$RUNNER_TEMP/rpm-build:/work" \
             -w /work \
             fedora:46 \
@@ -315,6 +316,7 @@ jobs:
               mv bld.spec rpmbuild/SPECS/
               rpmbuild -bb --define "_topdir /work/rpmbuild" --define "dist %{nil}" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/aarch64/bld-*.rpm /work/
+              chown "$HOST_UID:$HOST_GID" /work/bld-*.rpm
             '
 
           # Embedded package signature (rpmsign with the repository key)
@@ -635,6 +637,7 @@ jobs:
             packaging/rpm/bld.spec.tpl > "$RUNNER_TEMP/rpm-build/bld.spec"
 
           docker run --rm \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$RUNNER_TEMP/rpm-build:/work" \
             -w /work \
             fedora:46 \
@@ -645,6 +648,7 @@ jobs:
               mv bld.spec rpmbuild/SPECS/
               rpmbuild -bb --define "_topdir /work/rpmbuild" --define "dist %{nil}" rpmbuild/SPECS/bld.spec >/dev/null
               mv rpmbuild/RPMS/x86_64/bld-*.rpm /work/
+              chown "$HOST_UID:$HOST_GID" /work/bld-*.rpm
             '
 
           # Embedded package signature (rpmsign with the repository key)
