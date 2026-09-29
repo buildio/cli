@@ -1,13 +1,24 @@
 name: Build Linux Binary
 'on':
-  push:
-    tags:
-      - v*
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build
+        required: true
+        type: string
+      ref:
+        description: Commit to build
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       version:
         description: Version to build (e.g., 1.1.6)
         required: true
+        type: string
+      ref:
+        description: Optional commit to build
+        required: false
         type: string
 concurrency:
   group: cli-pages-publish-${{ github.ref }}
@@ -21,6 +32,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -156,7 +168,7 @@ jobs:
       - name: Build Alpine package
         id: apk
         env:
-          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           set -euo pipefail
 
@@ -214,7 +226,7 @@ jobs:
       - name: Build pacman package
         id: pacman
         env:
-          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          VERSION: ${{ inputs.version || github.ref_name }}
           GNUPG_HOME: ${{ steps.pacman_signing.outputs.gnupg_home }}
         run: |
           set -euo pipefail
@@ -276,7 +288,7 @@ jobs:
       - name: Build RPM package
         id: rpm
         env:
-          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          VERSION: ${{ inputs.version || github.ref_name }}
           GNUPG_HOME: ${{ steps.rpm_signing.outputs.gnupg_home }}
           KEY_FPR: ${{ steps.rpm_signing.outputs.key_fpr }}
         run: |
@@ -318,6 +330,7 @@ jobs:
           name: linux-arm64-artifacts
           path: arm64-artifacts/
           if-no-files-found: error
+          retention-days: 1
   build-linux-binary:
     needs: build-linux-arm64-binary
     runs-on: ubuntu-latest
@@ -325,6 +338,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -340,11 +354,7 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "VERSION=${{ inputs.version || github.ref_name }}" >> "$GITHUB_OUTPUT"
       - name: Create release zip
         run: |
           cd bin/linux-amd64
@@ -1146,54 +1156,35 @@ jobs:
           git -C public-pages add apt apk pacman rpm install.sh .nojekyll
           git -C public-pages commit -m "Publish APT package ${DEB_VERSION} and APK package ${PKGVER}" || true
           git -C public-pages push origin HEAD:gh-pages
-      - name: Build release body
-        env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
+      - name: Stage Linux release artifacts
         run: |
           set -euo pipefail
-          python3 - <<'PY' > release-body.md
-          from pathlib import Path
-          import os
-          import sys
-
-          readme = Path("README.md").read_text()
-          lines = readme.splitlines()
-
-          start = next((i for i, line in enumerate(lines) if line == "## Install"), None)
-          if start is None:
-              sys.exit("README.md is missing a ## Install section")
-
-          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
-          install = "\n".join(lines[start:end]).strip()
-          if not install:
-              sys.exit("README.md ## Install section is empty")
-
-          print(f"Release of version {os.environ['VERSION']}")
-          print()
-          print(install)
-          PY
-      - name: Create or update release
-        uses: softprops/action-gh-release@v3
+          rm -rf release-artifacts
+          mkdir -p release-artifacts
+          cp bin/linux-amd64/bld-linux-amd64.zip release-artifacts/
+          cp arm64-artifacts/bld-linux-arm64.zip release-artifacts/
+          cp "${{ steps.deb.outputs.deb_path }}" release-artifacts/
+          cp "${{ steps.keyring.outputs.keyring_deb_path }}" release-artifacts/
+          cp "bld-${{ steps.apk.outputs.pkgver }}.apk" release-artifacts/
+          cp "bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk" release-artifacts/
+          cp "pacman-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst" release-artifacts/
+          cp "pacman-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst" release-artifacts/
+          cp "rpm-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.rpm" release-artifacts/
+          cp "rpm-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.rpm" release-artifacts/
+      - name: Upload Linux release artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          name: Release v${{ steps.get_version.outputs.VERSION }}
-          body_path: release-body.md
-          files: |
-            bin/linux-amd64/bld-linux-amd64.zip
-            arm64-artifacts/bld-linux-arm64.zip
-            ${{ steps.deb.outputs.deb_path }}
-            ${{ steps.keyring.outputs.keyring_deb_path }}
-            bld-${{ steps.apk.outputs.pkgver }}.apk
-            bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk
-            pacman-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst
-            pacman-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst
-            rpm-verify/x86_64/bld-${{ steps.get_version.outputs.VERSION }}-1-x86_64.rpm
-            rpm-verify/aarch64/bld-${{ steps.get_version.outputs.VERSION }}-1-aarch64.rpm
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: linux-release-artifacts
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload Linux AMD64 ZIP for Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64-zip
+          path: bin/linux-amd64/bld-linux-amd64.zip
+          if-no-files-found: error
+          retention-days: 1
   build-flatpak:
     name: Build Flatpak
     needs: build-linux-binary
@@ -1204,22 +1195,17 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+      VERSION: ${{ inputs.version || github.ref_name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - name: Download Linux binary release attachment
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          curl \
-            --fail \
-            --location \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --output packaging/flatpak/bld-linux-amd64.zip \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bld-linux-amd64.zip"
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - name: Download Linux AMD64 ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-amd64-zip
+          path: packaging/flatpak
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -1228,11 +1214,10 @@ jobs:
           arch: x86_64
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
-      - name: Attach Flatpak to release
-        uses: softprops/action-gh-release@v3
+      - name: Upload Flatpak release artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          files: bld-linux-amd64.flatpak
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: linux-flatpak-release-artifacts
+          path: bld-linux-amd64.flatpak
+          if-no-files-found: error
+          retention-days: 1
