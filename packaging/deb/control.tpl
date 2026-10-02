@@ -2,7 +2,7 @@ Package: bld
 Version: @DEB_VERSION@
 Section: utils
 Priority: optional
-Architecture: amd64
+Architecture: @ARCH@
 Maintainer: Build.io <support@build.io>
 Homepage: https://app.build.io
 Depends: ca-certificates

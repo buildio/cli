@@ -182,6 +182,7 @@ jobs:
             dist/bld-darwin-arm64.tar.gz
             dist/bld-windows-amd64.zip
             dist/bld_${{ needs.prepare.outputs.version }}-1_amd64.deb
+            dist/bld_${{ needs.prepare.outputs.version }}-1_arm64.deb
             dist/buildio-archive-keyring_${{ needs.prepare.outputs.version }}-1_all.deb
             dist/bld-${{ needs.prepare.outputs.version }}-r0.apk
             dist/bld-${{ needs.prepare.outputs.version }}-r0_aarch64.apk
