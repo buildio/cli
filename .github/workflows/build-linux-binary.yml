@@ -327,6 +327,26 @@ jobs:
           test -s "$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.aarch64.rpm"
           echo "pkg_path=$RUNNER_TEMP/rpm-build/bld-${VERSION}-1.aarch64.rpm" >> "$GITHUB_OUTPUT"
           cp "$RUNNER_TEMP/rpm-build/bld-$VERSION-1.aarch64.rpm" arm64-artifacts/
+      - name: Build Debian package
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          DEB_VERSION="${VERSION#v}-1"
+          PACKAGE_ROOT="$RUNNER_TEMP/deb-build/pkg/bld_${DEB_VERSION}_arm64"
+
+          rm -rf "$PACKAGE_ROOT"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN"
+          mkdir -p "$PACKAGE_ROOT/usr/bin"
+          mkdir -p "$PACKAGE_ROOT/usr/share/doc/bld"
+
+          install -m 0755 bin/linux-arm64/bld "$PACKAGE_ROOT/usr/bin/bld"
+          sed -e "s/@DEB_VERSION@/${DEB_VERSION}/g" -e "s/@ARCH@/arm64/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
+          install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/bld/copyright"
+
+          dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "$RUNNER_TEMP/deb-build/bld_${DEB_VERSION}_arm64.deb"
+          cp "$RUNNER_TEMP/deb-build/bld_${DEB_VERSION}_arm64.deb" arm64-artifacts/
       - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -378,7 +398,7 @@ jobs:
           mkdir -p "$PACKAGE_ROOT/usr/share/doc/bld"
 
           install -m 0755 bin/linux-amd64/bld "$PACKAGE_ROOT/usr/bin/bld"
-          sed "s/@DEB_VERSION@/${DEB_VERSION}/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
+          sed -e "s/@DEB_VERSION@/${DEB_VERSION}/g" -e "s/@ARCH@/amd64/g" packaging/deb/control.tpl > "$PACKAGE_ROOT/DEBIAN/control"
           install -m 0644 packaging/deb/copyright "$PACKAGE_ROOT/usr/share/doc/bld/copyright"
 
           dpkg-deb --build --root-owner-group "$PACKAGE_ROOT" "bld_${DEB_VERSION}_amd64.deb"
@@ -753,21 +773,45 @@ jobs:
 
           echo "keyring_deb_path=buildio-archive-keyring_${DEB_VERSION}_all.deb" >> "$GITHUB_OUTPUT"
           echo "public_keys_path=apt-public-keys.asc" >> "$GITHUB_OUTPUT"
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-arm64-artifacts
+          path: arm64-artifacts
       - name: Verify Debian packages
         env:
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
           KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
+          DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
+          KEYRING_DEB_NAME: ${{ steps.keyring.outputs.keyring_deb_path }}
         run: |
           set -euo pipefail
           dpkg-deb --info "$DEB_PATH"
           dpkg-deb --contents "$DEB_PATH"
           dpkg-deb --info "$KEYRING_DEB_PATH"
           dpkg-deb --contents "$KEYRING_DEB_PATH"
-      - name: Download arm64 artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: linux-arm64-artifacts
-          path: arm64-artifacts
+
+          ARM_DEB="arm64-artifacts/bld_${DEB_VERSION}_arm64.deb"
+          test -s "$ARM_DEB"
+          dpkg-deb --info "$ARM_DEB"
+          dpkg-deb --contents "$ARM_DEB"
+
+          # Install-and-run like a user, under emulation (same pattern as the
+          # aarch64 APK verification below).
+          ARM_DEB_NAME="$(basename "$ARM_DEB")"
+          export ARM_DEB_NAME KEYRING_DEB_NAME
+          docker run --rm \
+            --platform linux/arm64 \
+            -e ARM_DEB_NAME -e KEYRING_DEB_NAME \
+            -v "$(pwd)":/work \
+            ubuntu:24.04 \
+            bash -c '
+              set -eu
+              apt-get update >/dev/null
+              apt-get install -y "/work/$ARM_DEB_NAME" "/work/$KEYRING_DEB_NAME" >/dev/null
+              BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
+              dpkg-query -W -f="${Package} ${Architecture} ${Version}\n" bld
+            '
       - name: Verify Alpine packages
         env:
           APK_PATH: ${{ steps.apk.outputs.apk_path }}
@@ -977,6 +1021,7 @@ jobs:
             cp "${old_debs[@]}" existing-debs/
           fi
           cp "$DEB_PATH" existing-debs/
+          cp "arm64-artifacts/bld_${DEB_VERSION}_arm64.deb" existing-debs/
           cp "$KEYRING_DEB_PATH" existing-debs/
 
           APTLY_ROOT="$RUNNER_TEMP/aptly"
@@ -1009,7 +1054,7 @@ jobs:
             -batch
             -distribution=stable
             -component=main
-            -architectures=amd64,all
+            -architectures=amd64,arm64,all
             -gpg-key="$APT_GPG_KEY_ID"
             -origin="Build.io"
             -label="Build.io CLI"
@@ -1170,6 +1215,7 @@ jobs:
           cp bin/linux-amd64/bld-linux-amd64.zip release-artifacts/
           cp arm64-artifacts/bld-linux-arm64.zip release-artifacts/
           cp "${{ steps.deb.outputs.deb_path }}" release-artifacts/
+          cp "arm64-artifacts/bld-${{ steps.deb.outputs.deb_version }}_arm64.deb" release-artifacts/
           cp "${{ steps.keyring.outputs.keyring_deb_path }}" release-artifacts/
           cp "bld-${{ steps.apk.outputs.pkgver }}.apk" release-artifacts/
           cp "bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk" release-artifacts/

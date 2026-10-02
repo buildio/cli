@@ -56,7 +56,7 @@ Same APT setup without `curl | sh`:
 
 ```bash
 curl -fsSL https://buildio.github.io/cli/apt/gpg.key | gpg --batch --yes --dearmor | sudo tee /usr/share/keyrings/buildio-archive-keyring.gpg >/dev/null
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg] https://buildio.github.io/cli/apt stable main" | sudo tee /etc/apt/sources.list.d/buildio-cli.list >/dev/null
+echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/buildio-archive-keyring.gpg] https://buildio.github.io/cli/apt stable main" | sudo tee /etc/apt/sources.list.d/buildio-cli.list >/dev/null
 echo 'Dir::Etc{SourceList sources.list.d/buildio-cli.list;SourceParts /dev/null}#clear APT::Update;'|sudo apt-get -c/dev/fd/0 update --no-list-cleanup
 sudo apt-get install -y buildio-archive-keyring bld
 ```
@@ -101,7 +101,7 @@ The repository includes GitHub Actions that build release artifacts before creat
   - Serves as a dependency for the [Build CLI CNB Buildpack](https://github.com/buildio/buildpack-bld-cli)
 - **Trigger**: The `Release CLI` workflow runs from the SDK update dispatch or manual workflow dispatch; the tag is created only after all release artifacts pass validation
 - **Build Process**: Uses Docker with Alpine Linux for the static Linux binary (natively on both amd64 and arm64 runners, so no emulation is needed for compilation), and MacPorts-hosted dependencies on GitHub macOS runners for Darwin binaries that install under `/opt/local`; Intel binaries request `MACOSX_DEPLOYMENT_TARGET=10.7` for Lion and newer, while Apple Silicon binaries target macOS 11.0 and newer
-- **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, `bld_<version>-r0_aarch64.apk`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-aarch64.pkg.tar.zst`, `bld_<version>-1.x86_64.rpm`, and `bld_<version>-1.aarch64.rpm` package assets; the APK, pacman, and RPM repositories serve both `x86_64` and `aarch64`, so the same install steps work on both architectures
+- **Output**: Releases `bld-linux-amd64.zip`, `bld-linux-arm64.zip`, `bld-darwin-amd64.tar.gz`, `bld-darwin-arm64.tar.gz`, `bld_<version>-1_amd64.deb`, `bld_<version>-1_arm64.deb`, `buildio-archive-keyring_<version>-1_all.deb`, `bld_<version>-r0.apk`, `bld_<version>-r0_aarch64.apk`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-x86_64.pkg.tar.zst`, `bld_<version>-1-aarch64.pkg.tar.zst`, `bld_<version>-1.x86_64.rpm`, and `bld_<version>-1.aarch64.rpm` package assets; the APT, APK, pacman, and RPM repositories serve both `amd64`/`x86_64` and `arm64`/`aarch64`, so the same install steps work on both architectures
 
 To trigger a new release manually:
 
