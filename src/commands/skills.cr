@@ -17,6 +17,7 @@ module Build
         "runtime.skills.command_reference_pipelines",
         "runtime.skills.command_reference_logs",
         "runtime.skills.command_reference_teams",
+        "runtime.skills.docs_mcp",
         "runtime.skills.tips",
       }
 
