@@ -1058,6 +1058,15 @@ en:
 
         # Team details
         bld teams:info TEAM -j | jq '.'
+      docs_mcp: |-
+        --- Docs MCP ---
+
+        # Search the build.io docs (English and Japanese) from any MCP client
+        # (public, read-only, no auth):
+        #   https://docs.build.io/mcp
+        # Tool: search_build_io_documentation(query) returns up to five
+        # matching sections with their URLs and full text.
+        # Details: https://docs.build.io/reference/mcp-server/
       tips: |-
         ============================================================
         TIPS FOR AI AGENTS
