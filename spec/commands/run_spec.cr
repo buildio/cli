@@ -17,9 +17,15 @@ require "../../src/commands/run"
       Build::Commands::Run.size_error(e, "huge").should eq("Could not get a huge session: invalid size 'huge'")
     end
 
-    it "says the platform is too old when run_session does not exist" do
-      e = Build::ApiError.new(code: 404, message: %({"code":"not_found"}))
-      Build::Commands::Run.size_error(e, "standard-2x").should contain("--size needs a newer Build platform")
+    it "says the platform is too old when it does not know attach" do
+      old = [
+        Build::ApiError.new(code: 422, message: %({"code":"bad_request","message":"command is required"})),
+        Build::ApiError.new(code: 404, message: %({"code":"not_found"})),
+        KeyError.new("Missing hash key: \"ticket\""),
+      ]
+      old.each do |e|
+        Build::Commands::Run.size_error(e, "standard-2x").should contain("--size needs a newer Build platform")
+      end
     end
   end
 {% end %}
