@@ -401,6 +401,7 @@ en:
         exit_code: "Passthrough the exit code of the remote command"
         file: "Send a local file as stdin to the remote command"
         shell: "Pass the command to the remote shell for interpretation (enables $VAR, globs, pipes, multi-command)"
+        size: "Dyno size for the session (e.g. Standard-2X); default is like a Heroku one-off dyno"
       help: |
         Run a one-off command on the Build platform. Useful for migrations,
         console sessions, or ad-hoc scripts.
@@ -625,6 +626,8 @@ en:
         shell: "-c 'echo $HOME | wc -c' -a my-app"
       no_app: "No app specified. Please use the --app option to specify the app to run the command on."
       file_not_found: "File not found: %{path}"
+      size_failed: "Could not get a %{size} session: %{error}"
+      size_unsupported: "--size needs a newer Build platform; run again without --size"
       spinner:
         retrieving_region: "Retrieving app region"
         connecting_server: "Connecting to server"
@@ -636,6 +639,7 @@ en:
         enabled: "Verbose mode enabled"
         connecting: "Connecting to %{host}:%{port}"
         terminal_size: "Terminal size: %{width}x%{height}"
+        size: "Session size: %{size}"
         ssh_established: "SSH connection established"
         authenticating: "Authenticating with app: %{app}"
         auth_success: "SSH authentication successful"
