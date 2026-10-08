@@ -1214,7 +1214,7 @@ jobs:
           cp bin/linux-amd64/bld-linux-amd64.zip release-artifacts/
           cp arm64-artifacts/bld-linux-arm64.zip release-artifacts/
           cp "${{ steps.deb.outputs.deb_path }}" release-artifacts/
-          cp "arm64-artifacts/bld-${{ steps.deb.outputs.deb_version }}_arm64.deb" release-artifacts/
+          cp "arm64-artifacts/bld_${{ steps.deb.outputs.deb_version }}_arm64.deb" release-artifacts/
           cp "${{ steps.keyring.outputs.keyring_deb_path }}" release-artifacts/
           cp "bld-${{ steps.apk.outputs.pkgver }}.apk" release-artifacts/
           cp "bld-${{ steps.apk.outputs.pkgver }}_aarch64.apk" release-artifacts/

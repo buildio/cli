@@ -74,7 +74,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo /opt/local/bin/port -N selfupdate
-          PORT_DIR="$RUNNER_TEMP/crystal-port"
+          # MacPorts reads the Portfile as the macports user, which cannot read $RUNNER_TEMP.
+          PORT_DIR=/tmp/crystal-port
           curl -fsSL --create-dirs -o "$PORT_DIR/Portfile" "$CRYSTAL_PORT_URL/Portfile"
           curl -fsSL --create-dirs -o "$PORT_DIR/files/patch-static.diff" "$CRYSTAL_PORT_URL/files/patch-static.diff"
           (cd "$PORT_DIR" && sudo /opt/local/bin/port -N install)
