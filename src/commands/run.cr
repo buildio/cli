@@ -26,6 +26,7 @@ module Build
           .option("exit-code", "x", :none, t("commands.run.options.exit_code"))
           .option("file", "f", :optional, t("commands.run.options.file"))
           .option("shell", "c", :none, t("commands.run.options.shell"))
+          .option("size", "s", :required, t("commands.run.options.size"))
           .description(t("commands.run.description"))
           .help(t("commands.run.help"))
           .usage(t("runtime.run.usage.bash"))
@@ -85,6 +86,21 @@ module Build
 
         app = self.api.app(app_id)
 
+        # With --size, the SSH password is a short-lived run ticket that carries the size.
+        password = user_token
+        session_size = nil
+        if size = input.option("size", type: String?)
+          begin
+            ticket = attach(app_id, size)
+            password = ticket["ticket"].as_s
+            session_size = ticket["size"].as_s
+          rescue e : ::Build::ApiError | KeyError
+            spinner.error
+            output.puts("<error>   #{Run.size_error(e, size)}</error>")
+            return ACON::Command::Status::FAILURE
+          end
+        end
+
         ssh_host = app.ssh_host
         ssh_port = app.ssh_port
         spinner.update(status: t("runtime.run.spinner.connecting_server"))
@@ -94,6 +110,7 @@ module Build
           output.puts t("runtime.run.verbose.connecting", host: ssh_host, port: ssh_port)
           output.puts t("runtime.labels.app", value: app.name)
           output.puts t("runtime.run.verbose.terminal_size", width: width, height: height)
+          output.puts t("runtime.run.verbose.size", size: session_size) if session_size
         end
 
         SSH2::Session.open(ssh_host, ssh_port) do |session|
@@ -104,7 +121,7 @@ module Build
           end
           
           begin
-            session.login(app.name, user_token)
+            session.login(app.name, password)
             if verbose
               output.puts t("runtime.run.verbose.auth_success")
             end
@@ -243,6 +260,26 @@ module Build
         end
 
         return ACON::Command::Status::SUCCESS
+      end
+
+      # POST /api/v1/apps/:app/dynos/run with attach: true => {"ticket", "expires_in", "size"}
+      private def attach(app_id : String, size : String) : JSON::Any
+        path = "/api/v1/apps/#{URI.encode_path(app_id)}/dynos/run"
+        header_params = {"Accept" => "application/json", "Content-Type" => "application/json"}
+        data, _status, _headers = ::Build::ApiClient.default.call_api(:POST, path,
+          :"DynosApi.run_dyno", "String", {"attach" => true, "size" => size}.to_json, ["bearer", "oauth2"],
+          header_params, Hash(String, String).new, Hash(String, String).new,
+          Hash(Symbol, (String | ::File)).new)
+        JSON.parse(data)
+      end
+
+      # The server's message (e.g. invalid size), or a hint when the platform does not know attach:
+      # it answers "command is required" (422), 404, or a response without a ticket (KeyError).
+      def self.size_error(e : Exception, size : String) : String
+        error = JSON.parse(e.message.to_s)["message"]?.try(&.as_s?) rescue nil
+        unsupported = e.is_a?(KeyError) || e.as?(::Build::ApiError).try(&.code) == 404 || error == "command is required"
+        return ::Build.t("runtime.run.size_unsupported") if unsupported
+        ::Build.t("runtime.run.size_failed", {size: size, error: error || e.message})
       end
 
       # Reads output from the SSH channel and writes to STDOUT
