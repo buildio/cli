@@ -783,7 +783,6 @@ jobs:
           DEB_PATH: ${{ steps.deb.outputs.deb_path }}
           KEYRING_DEB_PATH: ${{ steps.keyring.outputs.keyring_deb_path }}
           DEB_VERSION: ${{ steps.deb.outputs.deb_version }}
-          KEYRING_DEB_NAME: ${{ steps.keyring.outputs.keyring_deb_path }}
         run: |
           set -euo pipefail
           dpkg-deb --info "$DEB_PATH"
@@ -798,19 +797,19 @@ jobs:
 
           # Install-and-run like a user, under emulation (same pattern as the
           # aarch64 APK verification below).
-          ARM_DEB_NAME="$(basename "$ARM_DEB")"
-          export ARM_DEB_NAME KEYRING_DEB_NAME
+          # Both paths are relative to the workspace mounted at /work.
+          export ARM_DEB
           docker run --rm \
             --platform linux/arm64 \
-            -e ARM_DEB_NAME -e KEYRING_DEB_NAME \
+            -e ARM_DEB -e KEYRING_DEB_PATH \
             -v "$(pwd)":/work \
             ubuntu:24.04 \
             bash -c '
               set -eu
               apt-get update >/dev/null
-              apt-get install -y "/work/$ARM_DEB_NAME" "/work/$KEYRING_DEB_NAME" >/dev/null
+              apt-get install -y "/work/$ARM_DEB" "/work/$KEYRING_DEB_PATH" >/dev/null
               BUILD_NO_UPDATE_CHECK=1 bld --help >/dev/null
-              dpkg-query -W -f="${Package} ${Architecture} ${Version}\n" bld
+              dpkg-query -W -f="\${Package} \${Architecture} \${Version}\n" bld
             '
       - name: Verify Alpine packages
         env:
