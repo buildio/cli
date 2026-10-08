@@ -1,3 +1,20 @@
+Package: bld
+Priority: optional
+Section: utils
+Maintainer: Build.io <support@build.io>
+Architecture: arm64
+Version: 1.1.142-1
+Depends: ca-certificates
+Recommends: buildio-archive-keyring
+Filename: pool/main/b/bld/bld_1.1.142-1_arm64.deb
+Size: 3571112
+MD5sum: ca3329ff1959f53fdc6e57759a9bf452
+SHA1: 5370cdd944052598376925ab8db98cfc940a2056
+SHA256: f0e1ad53c4d7adfc2a3ff3c805a1ca05f1d7f070f0d497ef83d26543f0241a81
+SHA512: 3400bb11771a15778bca1423833379fd348f7e1ca41e28d278de77e4e4998bef2460cdfee207fe5ec16ab8f07dffeaecb07294bd23a2bc974adcbdfa05a96132
+Description: Build.io command-line client
+Homepage: https://app.build.io
+
 Package: buildio-archive-keyring
 Priority: optional
 Section: misc
