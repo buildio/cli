@@ -66,10 +66,20 @@ jobs:
           echo "/opt/local/sbin" >> "$GITHUB_PATH"
 
       - name: Install build dependencies
+        env:
+          # The crystal 1.21.1 port is linked against llvm-23 without
+          # crystal-lang/crystal#17432, so --release output is miscompiled.
+          # Install the 1.21.0 port (llvm-22) used by the last good release.
+          CRYSTAL_PORT_URL: https://raw.githubusercontent.com/macports/macports-ports/85cd82a82fde214a1a6333e47aecf3e191157167/lang/crystal
         run: |
           set -euo pipefail
           sudo /opt/local/bin/port -N selfupdate
-          sudo /opt/local/bin/port -N install crystal shards pkgconfig boehmgc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
+          PORT_DIR="$RUNNER_TEMP/crystal-port"
+          curl -fsSL --create-dirs -o "$PORT_DIR/Portfile" "$CRYSTAL_PORT_URL/Portfile"
+          curl -fsSL --create-dirs -o "$PORT_DIR/files/patch-static.diff" "$CRYSTAL_PORT_URL/files/patch-static.diff"
+          (cd "$PORT_DIR" && sudo /opt/local/bin/port -N install)
+          /opt/local/bin/crystal --version
+          sudo /opt/local/bin/port -N install shards pkgconfig boehmgc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
 
       - name: Build bld
         env:
