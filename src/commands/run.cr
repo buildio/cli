@@ -42,9 +42,6 @@ module Build
         "'" + arg.gsub("'", "'\\''") + "'"
       end
 
-      # Sentinel used to capture exit code from remote command
-      EXIT_CODE_SENTINEL = "\uFFFF bld-command-exit-status:"
-
       protected def execute(input : ACON::Input::Interface, output : ACON::Output::Interface) : ACON::Command::Status
         user_token = self.token
         if user_token.nil?
@@ -187,10 +184,6 @@ module Build
                 # re-interpret parens, braces, quotes, $VAR, backticks, or globs.
                 "/cnb/lifecycle/launcher #{command_array.map { |a| sh_quote(a) }.join(" ")}"
               end
-              # Append exit code sentinel if --exit-code is enabled
-              if exit_code_mode
-                cmd_string = "#{cmd_string}; echo \"#{EXIT_CODE_SENTINEL} $?\""
-              end
               spinner.update(status: t("runtime.run.spinner.running", command: display_cmd, app: app.name))
               if verbose
                 output.puts t("runtime.run.verbose.executing", command: cmd_string)
@@ -222,7 +215,7 @@ module Build
                       end
                     end
                   end
-                  remote_exit_code = read_channel_output(channel, output, verbose, exit_code_mode)
+                  read_channel_output(channel, output, verbose)
                 end
               end
             else
@@ -245,11 +238,20 @@ module Build
                       break
                     end
                   end
+                rescue SSH2::SessionError
+                  # The remote closed the channel before stdin ended.
                 ensure
                   input_io.close if file_path
                 end
               end
-              remote_exit_code = read_channel_output(channel, output, verbose, exit_code_mode)
+              read_channel_output(channel, output, verbose)
+            end
+
+            # ContainerSSH runs the command without a shell, so the exit code comes
+            # from the SSH exit-status, which arrives before the channel closes.
+            if exit_code_mode
+              channel.wait_closed
+              remote_exit_code = channel.exit_status
             end
           end
         end
@@ -282,68 +284,21 @@ module Build
         ::Build.t("runtime.run.size_failed", {size: size, error: error || e.message})
       end
 
-      # Reads output from the SSH channel and writes to STDOUT
-      # Returns the exit code if exit_code_mode is enabled and sentinel is found
-      private def read_channel_output(channel, output, verbose, exit_code_mode) : Int32?
-        buffer = Bytes.new(4096)
-        slice = buffer.to_slice
-        output_buffer = "" if exit_code_mode
-        exit_code : Int32? = nil
-
+      # Reads output from the SSH channel and writes to STDOUT until the channel is at EOF
+      private def read_channel_output(channel, output, verbose) : Nil
+        slice = Bytes.new(4096)
         loop do
           # Use read(0, slice) to bypass the library's early eof? check
           # This ensures we drain all buffered data before exiting
           count = channel.read(0, slice)
           if count > 0
-            data = String.new(slice[0, count])
-
-            if exit_code_mode
-              # Buffer output to detect exit code sentinel
-              output_buffer = output_buffer.not_nil! + data
-
-              # Check for exit code sentinel
-              if output_buffer.includes?(EXIT_CODE_SENTINEL)
-                # Parse exit code and remove sentinel from output
-                if match = output_buffer.match(/#{Regex.escape(EXIT_CODE_SENTINEL)} (\d+)/)
-                  exit_code = match[1].to_i
-                  # Remove the sentinel line from output
-                  clean_output = output_buffer.gsub(/#{Regex.escape(EXIT_CODE_SENTINEL)} \d+\n?/, "")
-                  STDOUT.write(clean_output.to_slice)
-                  STDOUT.flush
-                  output_buffer = ""
-                end
-              else
-                # Write buffered content that can't contain the sentinel
-                # Keep only the last part that might be a partial sentinel
-                safe_length = output_buffer.size - EXIT_CODE_SENTINEL.size - 10
-                if safe_length > 0
-                  STDOUT.write(output_buffer[0, safe_length].to_slice)
-                  STDOUT.flush
-                  output_buffer = output_buffer[safe_length..]
-                end
-              end
-            else
-              STDOUT.write(slice[0, count])
-              STDOUT.flush
-            end
-          else
-            # Only exit when read returns 0 AND channel is at EOF
-            if channel.eof?
-              # Flush any remaining buffered output
-              if exit_code_mode && !output_buffer.not_nil!.empty?
-                clean_output = output_buffer.not_nil!.gsub(/#{Regex.escape(EXIT_CODE_SENTINEL)} \d+\n?/, "")
-                STDOUT.write(clean_output.to_slice) unless clean_output.empty?
-                STDOUT.flush
-              end
-              if verbose
-                output.puts t("runtime.run.verbose.channel_closed")
-              end
-              break
-            end
+            STDOUT.write(slice[0, count])
+            STDOUT.flush
+          elsif channel.eof?
+            output.puts t("runtime.run.verbose.channel_closed") if verbose
+            break
           end
         end
-
-        exit_code
       end
     end
   end
