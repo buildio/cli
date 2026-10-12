@@ -74,10 +74,11 @@ jobs:
         run: |
           set -euo pipefail
           sudo /opt/local/bin/port -N selfupdate
-          # MacPorts reads the Portfile as the macports user, which cannot read $RUNNER_TEMP.
+          # MacPorts reads the Portfile as the macports user; curl --create-dirs makes 0750 dirs.
           PORT_DIR=/tmp/crystal-port
           curl -fsSL --create-dirs -o "$PORT_DIR/Portfile" "$CRYSTAL_PORT_URL/Portfile"
           curl -fsSL --create-dirs -o "$PORT_DIR/files/patch-static.diff" "$CRYSTAL_PORT_URL/files/patch-static.diff"
+          chmod -R a+rX "$PORT_DIR"
           (cd "$PORT_DIR" && sudo /opt/local/bin/port -N install)
           /opt/local/bin/crystal --version
           sudo /opt/local/bin/port -N install shards pkgconfig boehmgc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
