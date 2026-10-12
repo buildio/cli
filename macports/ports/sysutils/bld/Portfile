@@ -2,7 +2,7 @@
 PortSystem          1.0
 
 name                bld
-version             1.1.142
+version             1.1.143
 revision            0
 categories          sysutils net
 platforms           darwin
@@ -19,14 +19,14 @@ master_sites        https://github.com/buildio/cli/releases/download/v${version}
 
 if {${build_arch} eq "arm64"} {
     distname        bld-darwin-arm64
-    checksums       rmd160  fa7a67082b54f24d23fcf4023da0769b8d6aed68 \
-                    sha256  508bff51ba69b192d7b6349f41dc18f492f03510c42b691424fef3792035fc10 \
-                    size    1389594
+    checksums       rmd160  12020fa6f6d7a2838fdfe675d56c7f1dd0b147a0 \
+                    sha256  3390c8d298dcfab537ffc219c3b07e8556c8f7918ce5a3d83efb71fa3c09a07b \
+                    size    1388972
 } elseif {${build_arch} eq "x86_64"} {
     distname        bld-darwin-amd64
-    checksums       rmd160  3113df52b49c3d644c94c1e9f84ecb927d887a8d \
-                    sha256  3939e7c98a3bfc85b216d99f63dc1b213902f712345f4d31cd4674b87dd69f43 \
-                    size    1393285
+    checksums       rmd160  62f9dc8aaf02c1a4bd566f016d1036762525a2b1 \
+                    sha256  c3e0e1fda58a4bcd6df69890fc05571e5ed62df478d6139c0c79f9eced2606d2 \
+                    size    1392710
 } else {
     known_fail      yes
     pre-fetch {
