@@ -7,11 +7,11 @@ Version: 1.1.142-1
 Depends: ca-certificates
 Recommends: buildio-archive-keyring
 Filename: pool/main/b/bld/bld_1.1.142-1_arm64.deb
-Size: 3571104
-MD5sum: d08d27481447181759ade9f9612d6247
-SHA1: a36293e9e89d6b310db1971cfbfb2d6fca6f150c
-SHA256: 512ddcd86a554c0feb4d9056f661839a1c4ee0777e4dfb904d93e9389538470b
-SHA512: f2df441db53e967cef4097b4e7e0d95d6f78786d24e12e0ff895ca7c498a7473b78ce696c57e82bd15ad9ab32f26ca8d0910a9536a9ce03fd5eb4012174369e8
+Size: 3571084
+MD5sum: 8111d3a30d627854590c30f49e2f3148
+SHA1: a5c4e3629e03e6536045a965d4cb7218f13c7150
+SHA256: e746bcf04b23eec328aff4323d9e136aefe953eca1a6ea980178a657cadd31f8
+SHA512: c8df40c8ec1ac3c0263393f01a00e147bce06ae2182299ce0dae827abe0a7668c18e671e7a8c41c841a43d7aaad14a1ae117d02686be50452b845af653dade0b
 Description: Build.io command-line client
 Homepage: https://app.build.io
 
@@ -22,11 +22,11 @@ Maintainer: Build.io <support@build.io>
 Architecture: all
 Version: 1.1.142-1
 Filename: pool/main/b/buildio-archive-keyring/buildio-archive-keyring_1.1.142-1_all.deb
-Size: 2780
-MD5sum: 32ba63b848c52fabde3da90766dd93e8
-SHA1: 674cf80b14c06b8a59dbb384e35ec968aed0fa06
-SHA256: cea84d1428d89eaccd9ad5c0c2d0f9a11666b1778a243bd456bcce256dd2bbf0
-SHA512: a115c0329698eb975198aaaff535cde9afde52737537e9f7866e6c2235dae77b781e3028e66e441645669d69b1bdf26042ca58d3251fd3ab596a95d5a0783bd7
+Size: 2782
+MD5sum: 133b9969cefc41ffa3470001a9005e28
+SHA1: 51c34557549848d55bad6dc71d9ea6ddd49d9b02
+SHA256: 187d1270e323e2ffade8da22ebd02d68fb80599d97cb6aec893d096f26de59cc
+SHA512: e51f425889221e2ede774bc8c563efcf3794b2cb1cc2566ae0209e3a4192ab3e18f70f0b9db6ab40c73815f9b8bb977b9648db44c56cc81a88e23fbae5be143f
 Description: Build.io APT archive signing keyring
  Public signing keys used by the Build.io CLI APT repository.
 Homepage: https://app.build.io
