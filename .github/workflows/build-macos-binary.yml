@@ -80,8 +80,9 @@ jobs:
           curl -fsSL --create-dirs -o "$PORT_DIR/files/patch-static.diff" "$CRYSTAL_PORT_URL/files/patch-static.diff"
           chmod -R a+rX "$PORT_DIR"
           (cd "$PORT_DIR" && sudo /opt/local/bin/port -N install)
-          /opt/local/bin/crystal --version
-          sudo /opt/local/bin/port -N install shards pkgconfig boehmgc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
+          # -n: do not upgrade the pinned crystal to the llvm-23 build as a dependency.
+          sudo /opt/local/bin/port -N -n install shards pkgconfig boehmgc libevent libiconv libssh2 libxml2 libyaml openssl3 pcre2
+          /opt/local/bin/crystal --version | grep "^Crystal 1.21.0 "
 
       - name: Build bld
         env:
