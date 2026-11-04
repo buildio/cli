@@ -189,14 +189,22 @@ module Build
             if json_output
               output.puts data
             else
-              parsed = JSON.parse(data)
-              entries = parsed.as_a? || parsed.as_h.values.find(&.as_a?).try(&.as_a) || [parsed]
-              entries.each do |entry|
-                type = entry["type"]?.try(&.as_s?) || next
+              # The API returns a hash keyed by process type: {"web" => {...}}
+              rows = JSON.parse(data).as_h.compact_map do |type, entry|
                 qty = entry["quantity"]?.try(&.as_i?) || next
                 size = entry["size"]?.try(&.as_s?) || ""
-                label = size.empty? ? "#{type}=#{qty}" : "#{type}=#{qty}:#{size}"
-                output.puts label
+                label = "#{type.colorize.green.bold}=#{qty.to_s.colorize.yellow.bold}"
+                label += ":#{size.colorize.cyan}" unless size.empty?
+                {type, size, label}
+              end
+              if rows.empty?
+                output.puts("<info>#{t("runtime.ps.no_processes_for_app", app: app_id)}</info>")
+              else
+                rows.each { |_, _, label| output.puts label }
+                type, size, _ = rows.first
+                target = size.empty? ? "#{type}=2" : "#{type}=2:#{size}"
+                output.puts ""
+                output.puts t("runtime.ps.scale.hint", target: target, app: app_id).colorize(:dark_gray).to_s
               end
             end
             return ACON::Command::Status::SUCCESS
@@ -206,8 +214,9 @@ module Build
           end
         end
 
+        # The API has no GET /formation route; the dynos route returns the formation.
         private def fetch_formation(app_id : String) : String
-          path = "/api/v1/apps/#{URI.encode_path(app_id)}/formation"
+          path = "/api/v1/apps/#{URI.encode_path(app_id)}/dynos"
           api_client = ::Build::ApiClient.default
           header_params = Hash(String, String).new
           header_params["Accept"] = "application/json"
