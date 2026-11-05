@@ -83,7 +83,8 @@ end
 
 describe Build::Commands::Process::Scale do
   it "shows every process type and a scale hint" do
-    tester = ACON::Spec::CommandTester.new(PsFormationCommand.new(%({"web":{"size":"Standard-1X","display":"run web","quantity":1},"worker":{"quantity":2}})))
+    command = PsFormationCommand.new(%({"web":{"size":"Standard-1X","display":"run web","quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
     tester.execute({"--app" => "myapp"})
     plain = tester.display.gsub(/\e\[[0-9;]*m/, "")
     plain.should contain "web=1:Standard-1X"
