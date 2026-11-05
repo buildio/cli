@@ -83,22 +83,18 @@ end
 
 describe Build::Commands::Process::Scale do
   it "prints a done line for a response keyed by process type" do
-    tester = ACON::Spec::CommandTester.new(PsScaleCommand.new(%({"web":{"size":"Standard-1X","quantity":1},"worker":{"quantity":2}})))
+    command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
     tester.execute({"--app" => "myapp", "args" => ["web=1", "worker=2"]})
     tester.display.should contain "Scaling web=1:Standard-1X... done"
     tester.display.should contain "Scaling worker=2... done"
   end
 
   it "does not print types that were not scaled" do
-    tester = ACON::Spec::CommandTester.new(PsScaleCommand.new(%({"web":{"quantity":1},"worker":{"quantity":2}})))
+    command = PsScaleCommand.new(%({"web":{"quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
     tester.execute({"--app" => "myapp", "args" => ["web=1"]})
     tester.display.should contain "Scaling web=1... done"
     tester.display.should_not contain "worker"
-  end
-
-  it "prints a done line for a list response" do
-    tester = ACON::Spec::CommandTester.new(PsScaleCommand.new(%([{"type":"web","quantity":2}])))
-    tester.execute({"--app" => "myapp", "args" => ["web=2"]})
-    tester.display.should contain "Scaling web=2... done"
   end
 end

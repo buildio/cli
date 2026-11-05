@@ -165,10 +165,8 @@ module Build
             if json_output
               output.puts data
             else
-              # The API returns {"web" => {...}}; a list of {"type" => "web", ...} also works.
-              parsed = JSON.parse(data)
-              pairs = parsed.as_a? ? parsed.as_a.compact_map { |e| (t = e["type"]?.try(&.as_s?)) && {t, e} } : parsed.as_h.to_a
-              pairs.each do |type, entry|
+              # The API returns a hash keyed by process type: {"web" => {...}}
+              JSON.parse(data).as_h.each do |type, entry|
                 next unless updates.any? { |u| u["type"] == type }
                 qty = entry["quantity"]?.try(&.as_i?) || next
                 size = entry["size"]?.try(&.as_s?) || ""
