@@ -76,12 +76,34 @@ class PsScaleCommand < Build::Commands::Process::Scale
     Build::DefaultApi.new
   end
 
+  private def fetch_formation(app_id : String) : String
+    @body
+  end
+
   private def scale_formation(app_id : String, updates : Array(Hash(String, String | Int32))) : String
     @body
   end
 end
 
 describe Build::Commands::Process::Scale do
+  it "shows every process type and a scale hint" do
+    command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","display":"run web","quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
+    tester.execute({"--app" => "myapp"})
+    plain = tester.display.gsub(/\e\[[0-9;]*m/, "")
+    plain.should contain "web=1:Standard-1X"
+    plain.should contain "worker=2"
+    plain.should_not contain "formation:"
+    plain.should_not contain "run web"
+    plain.should contain "bld ps:scale web=2:Standard-1X -a myapp"
+  end
+
+  it "says so when the app has no processes" do
+    tester = ACON::Spec::CommandTester.new(PsScaleCommand.new("{}"))
+    tester.execute({"--app" => "myapp"})
+    tester.display.should contain "No processes found for app myapp"
+  end
+
   it "prints a done line for a response keyed by process type" do
     command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","quantity":1},"worker":{"quantity":2}}))
     tester = ACON::Spec::CommandTester.new(command)

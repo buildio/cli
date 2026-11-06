@@ -668,6 +668,7 @@ en:
         invalid_arg: "Invalid argument '%{arg}'. Use TYPE=QUANTITY[:SIZE]"
         invalid_quantity: "Invalid quantity '%{quantity}' in '%{arg}'"
         done: "Scaling %{label}... done"
+        hint: "Scale with: bld ps:scale %{target} -a %{app}"
         failed: "Failed to scale: %{error}"
         failed_get_formation: "Failed to get formation: %{error}"
       no_processes_for_app: "No processes found for app %{app}"
