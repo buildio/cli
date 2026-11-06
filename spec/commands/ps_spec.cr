@@ -66,3 +66,35 @@ describe Build::Commands::Process::List do
     tester.display.gsub(/\e\[[0-9;]*m/, "").should contain("worker.1: up 2024-01-15 10:30:00 +00:00 (~")
   end
 end
+
+class PsScaleCommand < Build::Commands::Process::Scale
+  def initialize(@body : String)
+    super()
+  end
+
+  def api : Build::DefaultApi
+    Build::DefaultApi.new
+  end
+
+  private def scale_formation(app_id : String, updates : Array(Hash(String, String | Int32))) : String
+    @body
+  end
+end
+
+describe Build::Commands::Process::Scale do
+  it "prints a done line for a response keyed by process type" do
+    command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
+    tester.execute({"--app" => "myapp", "args" => ["web=1", "worker=2"]})
+    tester.display.should contain "Scaling web=1:Standard-1X... done"
+    tester.display.should contain "Scaling worker=2... done"
+  end
+
+  it "does not print types that were not scaled" do
+    command = PsScaleCommand.new(%({"web":{"quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
+    tester.execute({"--app" => "myapp", "args" => ["web=1"]})
+    tester.display.should contain "Scaling web=1... done"
+    tester.display.should_not contain "worker"
+  end
+end
