@@ -195,14 +195,15 @@ module Build
                 size = entry["size"]?.try(&.as_s?) || ""
                 label = "#{type.colorize.green.bold}=#{qty.to_s.colorize.yellow.bold}"
                 label += ":#{size.colorize.cyan}" unless size.empty?
-                {type, size, label}
+                {type, size, qty, label}
               end
               if rows.empty?
                 output.puts("<info>#{t("runtime.ps.no_processes_for_app", app: app_id)}</info>")
               else
-                rows.each { |_, _, label| output.puts label }
-                type, size, _ = rows.first
-                target = size.empty? ? "#{type}=2" : "#{type}=2:#{size}"
+                rows.each { |_, _, _, label| output.puts label }
+                type, size, qty, _ = rows.first
+                example_qty = qty + 1
+                target = size.empty? ? "#{type}=#{example_qty}" : "#{type}=#{example_qty}:#{size}"
                 output.puts ""
                 output.puts t("runtime.ps.scale.hint", target: target, app: app_id).colorize(:dark_gray).to_s
               end
