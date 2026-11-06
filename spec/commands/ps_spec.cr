@@ -67,7 +67,7 @@ describe Build::Commands::Process::List do
   end
 end
 
-class PsFormationCommand < Build::Commands::Process::Scale
+class PsScaleCommand < Build::Commands::Process::Scale
   def initialize(@body : String)
     super()
   end
@@ -79,11 +79,15 @@ class PsFormationCommand < Build::Commands::Process::Scale
   private def fetch_formation(app_id : String) : String
     @body
   end
+
+  private def scale_formation(app_id : String, updates : Array(Hash(String, String | Int32))) : String
+    @body
+  end
 end
 
 describe Build::Commands::Process::Scale do
   it "shows every process type and a scale hint" do
-    command = PsFormationCommand.new(%({"web":{"size":"Standard-1X","display":"run web","quantity":1},"worker":{"quantity":2}}))
+    command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","display":"run web","quantity":1},"worker":{"quantity":2}}))
     tester = ACON::Spec::CommandTester.new(command)
     tester.execute({"--app" => "myapp"})
     plain = tester.display.gsub(/\e\[[0-9;]*m/, "")
@@ -95,8 +99,24 @@ describe Build::Commands::Process::Scale do
   end
 
   it "says so when the app has no processes" do
-    tester = ACON::Spec::CommandTester.new(PsFormationCommand.new("{}"))
+    tester = ACON::Spec::CommandTester.new(PsScaleCommand.new("{}"))
     tester.execute({"--app" => "myapp"})
     tester.display.should contain "No processes found for app myapp"
+  end
+
+  it "prints a done line for a response keyed by process type" do
+    command = PsScaleCommand.new(%({"web":{"size":"Standard-1X","quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
+    tester.execute({"--app" => "myapp", "args" => ["web=1", "worker=2"]})
+    tester.display.should contain "Scaling web=1:Standard-1X... done"
+    tester.display.should contain "Scaling worker=2... done"
+  end
+
+  it "does not print types that were not scaled" do
+    command = PsScaleCommand.new(%({"web":{"quantity":1},"worker":{"quantity":2}}))
+    tester = ACON::Spec::CommandTester.new(command)
+    tester.execute({"--app" => "myapp", "args" => ["web=1"]})
+    tester.display.should contain "Scaling web=1... done"
+    tester.display.should_not contain "worker"
   end
 end

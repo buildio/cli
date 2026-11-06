@@ -165,10 +165,9 @@ module Build
             if json_output
               output.puts data
             else
-              parsed = JSON.parse(data)
-              entries = parsed.as_a? || parsed.as_h.values.find(&.as_a?).try(&.as_a) || [parsed]
-              entries.each do |entry|
-                type = entry["type"]?.try(&.as_s?) || next
+              # The API returns a hash keyed by process type: {"web" => {...}}
+              JSON.parse(data).as_h.each do |type, entry|
+                next unless updates.any? { |u| u["type"] == type }
                 qty = entry["quantity"]?.try(&.as_i?) || next
                 size = entry["size"]?.try(&.as_s?) || ""
                 label = size.empty? ? "#{type}=#{qty}" : "#{type}=#{qty}:#{size}"
